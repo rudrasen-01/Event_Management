@@ -1,0 +1,336 @@
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, MapPin, Sparkles, TrendingUp, Package, List } from 'lucide-react';
+import { ServiceProvider, useService } from '../contexts/ServiceContext';
+import DynamicFilterPanel from '../components/DynamicFilterPanel';
+import VendorCard from '../components/VendorCard';
+import SolutionCard from '../components/SolutionCard';
+import { getSuggestedServices } from '../services/filterService';
+import { fetchVendors } from '../services/api';
+
+/**
+ * DYNAMIC SEARCH PAGE
+ * 
+ * This page is service-agnostic - it doesn't know about photography, tents, or pandits
+ * All logic is driven by the active service context
+ * 
+ * When backend is ready:
+ * 1. Replace mock fetchVendors with real API
+ * 2. Replace detectService with ML intent detection API
+ * 3. Add debounced search with cancel tokens
+ */
+
+const DynamicSearchPageContent = () => {
+  const [searchParams] = useSearchParams();
+  const {
+    search,
+    selectCategory,
+    filterSchema,
+    appliedFilters,
+    searchContext,
+    setFilter,
+    clearAllFilters,
+    isLoading: contextLoading
+  } = useService();
+
+  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('solutions'); // solutions | vendors
+  const [sortBy, setSortBy] = useState('relevance');
+
+  // Detect service when query changes
+  useEffect(() => {
+    if (query.length > 0) {
+      search(query);
+      
+      // Show suggestions
+      const suggested = getSuggestedServices(query);
+      setSuggestions(suggested);
+      setShowSuggestions(suggested.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  }, [query]);
+
+  // Execute search when filters change
+  useEffect(() => {
+    if (activeService && filterValues.city) {
+      executeSearch();
+    }
+  }, [activeService, filterValues, sortBy]);
+
+  const executeSearch = async () => {
+    setLoading(true);
+    
+    try {
+      // API search with proper field mapping - database-driven only
+      const response = await fetchVendors({
+        serviceType: activeService || serviceConfig?.serviceId,
+        city: filterValues.city,
+        radius: filterValues.radius || 10,
+        budgetMin: filterValues.budgetMin || 0,
+        budgetMax: filterValues.budgetMax || 10000000,
+        sortBy
+      });
+      
+      // Use only database-driven results - no mock data fallback
+      const vendorsList = response.vendors || [];
+      setResults(vendorsList);
+      
+      if (vendorsList.length === 0) {
+        console.log('ℹ️ No vendors found in database for current search criteria');
+      }
+    } catch (error) {
+      console.error('❌ Search error:', error);
+      // Show empty state on error - no mock data
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (query.trim()) {
+      detectService(query);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSuggestionClick = (serviceId) => {
+    selectCategory(serviceId);
+    setShowSuggestions(false);
+  };
+
+  const handleApplyFilters = (filters) => {
+    // Filters are already updated in context
+    // Just trigger search
+    executeSearch();
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Search Bar - Sticky */}
+      <div className="sticky top-16 md:top-20 z-30 bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <form onSubmit={handleSearch} className="relative">
+            <div className="flex items-center gap-3">
+              {/* Search Input */}
+              <div className="flex-1 relative">
+                <div className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-gray-300 rounded-lg focus-within:border-indigo-500 transition-colors">
+                  <Search className="w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search for Photographer, Tent, Pandit, Caterer..."
+                    className="flex-1 text-sm focus:outline-none"
+                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  />
+                  {searchContext.category && filterSchema && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
+                      <span>{filterSchema.detectedService?.icon || '🔍'}</span>
+                      <span>{filterSchema.detectedService?.name || searchContext.category}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Service Suggestions Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
+                    <div className="p-2">
+                      <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2">
+                        Detected Services
+                      </div>
+                      {suggestions.map(service => (
+                        <button
+                          key={service.serviceId}
+                          onClick={() => handleSuggestionClick(service.serviceId)}
+                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-indigo-50 rounded text-left"
+                        >
+                          <span className="text-2xl">{service.icon}</span>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{service.serviceName}</div>
+                            <div className="text-xs text-gray-500">Click to load filters</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Search
+              </button>
+            </div>
+          </form>
+
+          {/* Active Service Indicator */}
+          {activeService && serviceConfig && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span>
+                Showing filters for <strong className="text-gray-900">{serviceConfig.serviceName}</strong>
+              </span>
+              {serviceConfig.budgetRange && (
+                <span className="text-gray-500">
+                  • Typical budget: ₹{serviceConfig.budgetRange.min.toLocaleString()} - ₹{serviceConfig.budgetRange.max.toLocaleString()}
+                  {serviceConfig.budgetRange.unit && ` ${serviceConfig.budgetRange.unit}`}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex gap-6">
+          {/* Left Sidebar - Dynamic Filters */}
+          <div className="w-80 flex-shrink-0">
+            <div className="sticky top-24">
+              {contextLoading ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded mb-4"></div>
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              ) : (
+                <DynamicFilterPanel 
+                  filterSchema={filterSchema}
+                  appliedFilters={appliedFilters}
+                  onFilterChange={setFilter}
+                  onClearAll={clearAllFilters}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Right Content - Results */}
+          <div className="flex-1">
+            {/* Results Header */}
+            <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {loading ? 'Searching...' : `${results.length} Results Found`}
+                  </h2>
+                  {appliedFilters.city && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      <MapPin className="w-4 h-4 inline mr-1" />
+                      {appliedFilters.city}
+                      {appliedFilters.area && `, ${appliedFilters.area}`}
+                      {appliedFilters.radius && appliedFilters.radius !== 'city' && ` (Within ${appliedFilters.radius}km)`}
+                      {appliedFilters.radius === 'city' && ' (Entire City)'}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setViewMode('solutions')}
+                      className={`px-3 py-1.5 text-sm font-medium rounded flex items-center gap-1 ${
+                        viewMode === 'solutions'
+                          ? 'bg-white text-indigo-600 shadow-sm'
+                          : 'text-gray-600'
+                      }`}
+                    >
+                      <Package className="w-4 h-4" />
+                      Solutions
+                    </button>
+                    <button
+                      onClick={() => setViewMode('vendors')}
+                      className={`px-3 py-1.5 text-sm font-medium rounded flex items-center gap-1 ${
+                        viewMode === 'vendors'
+                          ? 'bg-white text-indigo-600 shadow-sm'
+                          : 'text-gray-600'
+                      }`}
+                    >
+                      <List className="w-4 h-4" />
+                      Vendors
+                    </button>
+                  </div>
+
+                  {/* Sort */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="relevance">Relevance</option>
+                    <option value="rating">Rating</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                    <option value="distance">Distance</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Results Grid */}
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
+                    <div className="h-6 bg-gray-200 rounded mb-3"></div>
+                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                  </div>
+                ))}
+              </div>
+            ) : results.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                <div className="text-6xl mb-4">🔍</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">No Results Found</h3>
+                <p className="text-gray-600 mb-6">
+                  {!activeService
+                    ? 'Try searching for a specific service like "Photographer", "Tent", or "Pandit"'
+                    : !filterValues.city
+                    ? 'Please select a location in the filters to see results'
+                    : 'Try adjusting your filters or search in a wider area'}
+                </p>
+                {activeService && serviceConfig && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                    <span>{serviceConfig.icon}</span>
+                    <span>Currently searching for: <strong>{serviceConfig.serviceName}</strong></span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {results.map((vendor, idx) => (
+                  <VendorCard key={vendor._id || idx} vendor={vendor} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Wrapper with ServiceProvider
+ */
+const DynamicSearchPage = () => {
+  return (
+    <ServiceProvider>
+      <DynamicSearchPageContent />
+    </ServiceProvider>
+  );
+};
+
+export default DynamicSearchPage;

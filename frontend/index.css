@@ -1,0 +1,22 @@
+
+
+/* Modal and Overlay Fixes */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* Ensure modals are always on top */
+.modal-backdrop {
+  isolation: isolate;
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+  }
+  .sticky {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+}

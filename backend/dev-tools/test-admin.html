@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin API Test</title>
+</head>
+<body>
+    <h1>Admin API Test</h1>
+    <div id="output"></div>
+    
+    <script>
+        async function testAdminAPI() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Step 1: Login
+                output.innerHTML += '<h2>Step 1: Login</h2>';
+                const loginRes = await fetch('http://localhost:5000/api/users/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@aissignatureevent.com',
+                        password: 'admin123456'
+                    })
+                });
+                const loginData = await loginRes.json();
+                output.innerHTML += `<pre>${JSON.stringify(loginData, null, 2)}</pre>`;
+                
+                if (!loginData.success) {
+                    output.innerHTML += '<p style="color:red">Login failed!</p>';
+                    return;
+                }
+                
+                const token = loginData.data.token;
+                output.innerHTML += '<p style="color:green">✅ Login successful!</p>';
+                
+                // Step 2: Get Stats
+                output.innerHTML += '<h2>Step 2: Get Admin Stats</h2>';
+                const statsRes = await fetch('http://localhost:5000/api/admin/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const statsData = await statsRes.json();
+                output.innerHTML += `<pre>${JSON.stringify(statsData, null, 2)}</pre>`;
+                
+                // Step 3: Get Vendors
+                output.innerHTML += '<h2>Step 3: Get Vendors</h2>';
+                const vendorsRes = await fetch('http://localhost:5000/api/admin/vendors?page=1&limit=5', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const vendorsData = await vendorsRes.json();
+                output.innerHTML += `<pre>${JSON.stringify(vendorsData, null, 2)}</pre>`;
+                
+                // Step 4: Get Inquiries
+                output.innerHTML += '<h2>Step 4: Get Inquiries</h2>';
+                const inquiriesRes = await fetch('http://localhost:5000/api/admin/inquiries?page=1&limit=5', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const inquiriesData = await inquiriesRes.json();
+                output.innerHTML += `<pre>${JSON.stringify(inquiriesData, null, 2)}</pre>`;
+                
+            } catch (error) {
+                output.innerHTML += `<p style="color:red">Error: ${error.message}</p>`;
+            }
+        }
+        
+        testAdminAPI();
+    </script>
+</body>
+</html>
