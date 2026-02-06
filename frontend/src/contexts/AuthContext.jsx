@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }) => {
 
       // Redirect based on role
       if (data.data.user.role === 'admin') {
-        navigate('/admin/dashboard');
+        navigate('/admin');
       } else {
         // Regular users stay on homepage (Flipkart/Amazon style)
         navigate('/');

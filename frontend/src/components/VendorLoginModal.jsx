@@ -37,12 +37,19 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Store vendor info in localStorage
+        // Store vendor info and JWT token in localStorage
         const vendor = data.data;
-        localStorage.setItem('vendorToken', vendor.vendorId); // Using vendorId as token for now
+        const token = data.token;
+        
+        // Store JWT token for API authentication
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('vendorToken', token); // Backward compatibility
+        
+        // Store vendor info
         localStorage.setItem('vendorId', vendor._id);
         localStorage.setItem('vendorEmail', vendor.email);
         localStorage.setItem('vendorBusinessName', vendor.businessName || vendor.name);
+        localStorage.setItem('userRole', 'vendor');
         
         // Call success callback
         onLoginSuccess(vendor);

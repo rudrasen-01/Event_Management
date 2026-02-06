@@ -302,24 +302,35 @@ exports.getAllInquiries = async (req, res, next) => {
 /**
  * Get inquiries for a specific vendor
  * Uses VendorInquiry collection only
+ * NOTE: Vendors can only see APPROVED inquiries
  */
 exports.getVendorInquiries = async (req, res, next) => {
   try {
     const { vendorId } = req.params;
     const { status, page = 1, limit = 20 } = req.query;
 
-    const query = { vendorId };
+    // IMPORTANT: Vendors can only see approved inquiries
+    const query = { 
+      vendorId,
+      approvalStatus: 'approved' // Only show approved inquiries to vendors
+    };
+    
     if (status) query.status = status;
+
+    console.log(`\n🔍 Fetching inquiries for vendor ${vendorId} (APPROVED ONLY)`);
 
     const skip = (page - 1) * limit;
 
     const inquiries = await VendorInquiry.find(query)
       .populate('vendorId', 'name businessName serviceType contact.email contact.phone city')
+      .populate('approvedBy', 'name email') // Include admin who approved
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
     const total = await VendorInquiry.countDocuments(query);
+    
+    console.log(`✅ Found ${total} approved inquiries for vendor`);
 
     res.json({
       success: true,

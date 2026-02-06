@@ -11,6 +11,8 @@ const {
   approveVendor,
   rejectVendor
 } = require('../controllers/vendorControllerNew');
+const inquiryController = require('../controllers/inquiryController');
+const { protect } = require('../middleware/authMiddleware');
 
 // Public Routes
 
@@ -35,6 +37,56 @@ router.get('/:vendorId', getVendor);
 router.post('/:vendorId/review', addReview);
 
 // Vendor Routes (should be protected with auth middleware)
+
+// @route   GET /api/vendors/dashboard/inquiries
+// @desc    Get inquiries for logged-in vendor (approved only)
+// @access  Private (Vendor)
+router.get('/dashboard/inquiries', protect, async (req, res, next) => {
+  try {
+    // Get vendor MongoDB _id from authenticated user (NOT the custom vendorId string)
+    const vendorMongoId = req.user._id;
+    
+    if (!vendorMongoId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Vendor authentication required'
+      });
+    }
+
+    console.log('🔍 Authenticated Vendor ID (MongoDB _id):', vendorMongoId);
+    console.log('🔍 Vendor custom vendorId:', req.user.vendorId);
+
+    // Pass MongoDB _id to inquiry controller
+    req.params.vendorId = vendorMongoId;
+    return inquiryController.getVendorInquiries(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Deprecated route - keeping for backward compatibility
+// @route   GET /api/vendors/inquiries
+// @desc    Get inquiries for logged-in vendor (approved only)
+// @access  Private (Vendor)
+router.get('/inquiries', protect, async (req, res, next) => {
+  try {
+    // Get vendor MongoDB _id from authenticated user (NOT the custom vendorId string)
+    const vendorMongoId = req.user._id;
+    
+    if (!vendorMongoId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Vendor authentication required'
+      });
+    }
+
+    // Pass MongoDB _id to inquiry controller
+    req.params.vendorId = vendorMongoId;
+    return inquiryController.getVendorInquiries(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // @route   PUT /api/vendors/:vendorId
 // @desc    Update vendor profile

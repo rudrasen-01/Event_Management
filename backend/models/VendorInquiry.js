@@ -123,6 +123,42 @@ const vendorInquirySchema = new mongoose.Schema({
     index: true
   },
   
+  // Admin Approval Status (NEW FEATURE)
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    index: true
+  },
+  
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User' // Reference to admin who approved/rejected
+  },
+  
+  approvedAt: {
+    type: Date
+  },
+  
+  rejectionReason: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
+  
+  // Active Status (for admin management)
+  isActive: {
+    type: Boolean,
+    default: true,
+    index: true
+  },
+  
+  // Admin Notes
+  adminNotes: {
+    type: String,
+    trim: true
+  },
+  
   // Source
   source: {
     type: String,
@@ -145,7 +181,8 @@ const vendorInquirySchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-vendorInquirySchema.index({ vendorId: 1, status: 1, createdAt: -1 });
+vendorInquirySchema.index({ vendorId: 1, approvalStatus: 1, status: 1, createdAt: -1 });
+vendorInquirySchema.index({ approvalStatus: 1, createdAt: -1 });
 vendorInquirySchema.index({ userContact: 1, createdAt: -1 });
 vendorInquirySchema.index({ status: 1, createdAt: -1 });
 vendorInquirySchema.index({ createdAt: -1 });

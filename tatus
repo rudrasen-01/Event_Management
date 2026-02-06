@@ -1,0 +1,261 @@
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/ADMIN-USER-PANELS-GUIDE.md b/ADMIN-USER-PANELS-GUIDE.md[m
+[1mdeleted file mode 100644[m
+[1mindex 13bdfcd..0000000[m
+[1m--- a/ADMIN-USER-PANELS-GUIDE.md[m
+[1m+++ /dev/null[m
+[36m@@ -1,536 +0,0 @@[m
+[31m-# Admin & User Panels Implementation Guide[m
+[31m-[m
+[31m-## 🎯 Overview[m
+[31m-Professional admin and user dashboards with role-based access control, real-time statistics, and modern UI components.[m
+[31m-[m
+[31m----[m
+[31m-[m
+[31m-## 📁 Project Structure[m
+[31m-[m
+[31m-### Backend Files Created[m
+[31m-```[m
+[31m-backend/[m
+[31m-├── controllers/[m
+[31m-│   └── adminController.js       ← Admin operations (stats, users, vendors, inquiries)[m
+[31m-├── middleware/[m
+[31m-│   └── adminMiddleware.js       ← Role-based access control[m
+[31m-└── routes/[m
+[31m-    └── adminRoutes.js           ← Admin API endpoints[m
+[31m-```[m
+[31m-[m
+[31m-### Frontend Files Created[m
+[31m-```[m
+[31m-frontend/src/[m
+[31m-├── components/[m
+[31m-│   ├── StatsCard.jsx            ← Statistics display card[m
+[31m-│   ├── StatusBadge.jsx          ← Status indicator badges[m
+[31m-│   ├── ModalDialog.jsx          ← Modal component[m
+[31m-│   └── DataTable.jsx            ← Data table with pagination[m
+[31m-└── pages/[m
+[31m-    ├── AdminDashboardNew.jsx    ← Admin panel[m
+[31m-    └── UserDashboardNew.jsx     ← User dashboard[m
+[31m-```[m
+[31m-[m
+[31m----[m
+[31m-[m
+[31m-## 🔐 Admin Panel Features[m
+[31m-[m
+[31m-### Access the Admin Panel[m
+[31m-**Route:** `/admin/dashboard`  [m
+[31m-**Login Required:** Yes (Admin role)[m
+[31m-[m
+[31m-### 1. Dashboard Overview Tab[m
+[31m-- **Total Users** - Count of registered customers[m
+[31m-- **Total Vendors** - All vendors (verified + unverified)[m
+[31m-- **Total Inquiries** - Vendor + Contact inquiries combined[m
+[31m-- **Pending Inquiries** - Inquiries awaiting response[m
+[31m-- **Recent Activity** - Latest vendor and contact inquiries[m
+[31m-[m
+[31m-### 2. Vendors Management Tab[m
+[31m-**Features:**[m
+[31m-- View all vendors with pagination[m
+[31m-- Search by name, email, business name[m
+[31m-- Filter by verification status[m
+[31m-- Filter by service type and city[m
+[31m-- Verify/Unverify vendors[m
+[31m-- View vendor details in modal[m
+[31m-- Delete vendors[m
+[31m-[m
+[31m-**Table Columns:**[m
+[31m-- Business Name & Email[m
+[31m-- Service Type[m
+[31m-- City[m
+[31m-- Verification Status[m
+[31m-- Actions (View/Edit)[m
+[31m-[m
+[31m-### 3. Inquiries Management Tab[m
+[31m-**Features:**[m
+[31m-- View both Vendor Inquiries and Contact Inquiries[m
+[31m-- Embedded vendor details for vendor inquiries[m
+[31m-- Update inquiry status[m
+[31m-- Add admin notes (for contact inquiries)[m
+[31m-- Filter by type and status[m
+[31m-- Pagination support[m
+[31m-[m
+[31m-**Table Columns:**[m
+[31m-- Inquiry ID[m
+[31m-- Customer Name & Contact[m
+[31m-- Inquiry Type (Vendor/Contact)[m
+[31m-- Vendor Name (for vendor inquiries)[m
+[31m-- Status Badge[m
+[31m-- Created Date[m
+[31m-[m
+[31m-### 4. Users Management Tab[m
+[31m-**Features:**[m
+[31m-- View all registered users[m
+[31m-- Search by name, email, phone[m
+[31m-- Filter by active/inactive status[m
+[31m-- Activate/Deactivate users[m
+[31m-- Change user roles (user ↔ admin)[m
+[31m-- View user activity[m
+[31m-[m
+[31m-**Table Columns:**[m
+[31m-- Name & Email[m
+[31m-- Phone Number[m
+[31m-- Account Status[m
+[31m-- Join Date[m
+[31m-[m
+[31m----[m
+[31m-[m
+[31m-## 👤 User Dashboard Features[m
+[31m-[m
+[31m-### Access the User Dashboard[m
+[31m-**Route:** `/user/dashboard`  [m
+[31m-**Login Required:** Yes (User role)[m
+[31m-[m
+[31m-### 1. Profile Tab[m
+[31m-**Features:**[m
+[31m-- View personal information[m
+[31m-- Edit profile (name, email, phone)[m
+[31m-- See member since date[m
+[31m-- Profile picture upload (future)[m
+[31m-[m
+[31m-**Editable Fields:**[m
+[31m-- Full Name[m
+[31m-- Email Address[m
+[31m-- Phone Number[m
+[31m-[m
+[31m-### 2. My Inquiries Tab[m
+[31m-**Features:**[m
+[31m-- View all inquiries submitted by user[m
+[31m-- Filter by status[m
+[31m-- View inquiry details in modal[m
+[31m-- Track inquiry status (pending → contacted → responded → closed)[m
+[31m-- See embedded vendor details for vendor inquiries[m
+[31m-[m
+[31m-**Inquiry Card Shows:**[m
+[31m-- Vendor/Event name[m
+[31m-- Status badge[m
+[31m-- Date submitted[m
+[31m-- Budget[m
+[31m-- Service type and city (for vendor inquiries)[m
+[31m-[m
+[31m-### 3. Favorites Tab (Coming Soon)[m
+[31m-**Features:**[m
+[31m-- Save favorite vendors[m
+[31m-- Quick access to saved vendors[m
+[31m-- Remove from favorites[m
+[31m-[m
+[31m----[m
+[31m-[m
+[31m-## 🔌 Backend API Endpoints[m
+[31m-[m
+[31m-### Admin Routes (Protected - Admin Only)[m
+[31m-[m
+[31m-#### 1. Get Dashboard Statistics[m
+[31m-```http[m
+[31m-GET /api/admin/stats[m
+[31m-Authorization: Bearer <admin_token>[m
+[31m-```[m
+[31m-**Response:**[m
+[31m-```json[m
+[31m-{[m
+[31m-  "success": true,[m
+[31m-  "data": {[m
+[31m-    "overview": {[m
+[31m-      "totalUsers": 150,[m
+[31m-      "totalVendors": 45,[m
+[31m-      "verifiedVendors": 32,[m
+[31m-      "totalInquiries": 320,[m
+[31m-      "pendingInquiries": 45[m
+[31m-    },[m
+[31m-    "recentActivity": {[m
+[31m-      "vendorInquiries": [...],[m
+[31m-      "contactInquiries": [...][m
+[31m-    },[m
+[31m-    "trends": {[m
+[31m-      "inquiryTrends": [...],[m
+[31m-      "vendorsByService": [...][m
+[31m-    }[m
+[31m-  }[m
+[31m-}[m
+[31m-```[m
+[31m-[m
+[31m-#### 2. Get All Users[m
+[31m-```http[m
+[31m-GET /api/admin/users?page=1&limit=20&search=john&status=active[m
+[31m-Authorization: Bearer <admin_token>[m
+[31m-```[m
+[31m-[m
+[31m-#### 3. Update User Status[m
+[31m-```http[m
+[31m-PATCH /api/admin/users/:userId[m
+[31m-Authorization: Bearer <admin_token>[m
+[31m-Content-Type: application/json[m
+[31m-[m
+[31m-{[m
+[31m-  "isActive": true,[m
+[31m-  "role": "admin"[m
+[31m-}[m
+[31m-```[m
+[31m-[m
+[31m-#### 4. Get All Vendors[m
+[31m-```http[m
+[31m-GET /api/admin/vendors?page=1&limit=20&verified=true&serviceType=decoration[m
+[31m-Authorization: Bearer <admin_token>[m
+[31m-```[m
+[31m-[m
+[31m-#### 5. Verify/Unverify Vendor[m
+[31m-```http[m
+[31m-PATCH /api/admin/vendors/:vendorId/verify[m
+[31m-Authorization: Bearer <admin_token>[m
+[31m-Content-Type: application/json[m
+[31m-[m
+[31m-{[m
+[31m-  "verified": true[m
+[31m-}[m
+[31m-```[m
+[31m-[m
+[31m-#### 6. Get All Inquiries[m
+[31m-```http[m
+[31m-GET /api/admin/inquiries?page=1&limit=20&type=vendor&status=pending[m
+[31m-Authorization: Bearer <admin_token>[m
+[31m-```[m
+[31m-[m
+[31m-#### 7. Update Inquiry Status[m
+[31m-```http[m
+[31m-PATCH /api/admin/inquiries/:inquiryId[m
+[31m-Authorization: Bearer <admin_token>[m
+[31m-Content-Type: application/json[m
+[31m-[m
+[31m-{[m
+[31m-  "status": "contacted",[m
+[31m-  "type": "vendor",[m
+[31m-  "notes": "Followed up with customer"[m
+[31m-}[m
+[31m-```[m
+[31m-[m
+[31m----[m
+[31m-[m
+[31m-## 🎨 UI Components Documentation[m
+[31m-[m
+[31m-### 1. StatsCard Component[m
+[31m-```jsx[m
+[31m-<StatsCard[m
+[31m-  title="Total Users"[m
+[31m-  value={150}[m
+[31m-  icon={Users}[m
+[31m-  color="blue"[m
+[31m-  trend="up"[m
+[31m-  trendValue="+12%"[m
+[31m-  description="Active users"[m
+[31m-  onClick={() => handleCardClick()}[m
+[31m-/>[m
+[31m-```[m
+[31m-[m
+[31m-**Props:**[m
+[31m-- `title` - Card title[m
+[31m-- `value` - Main statistic value[m
+[31m-- `icon` - Lucide icon component[m
+[31m-- `color` - 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'indigo'[m
+[31m-- `trend` - 'up' | 'down' | 'neutral'[m
+[31m-- `trendValue` - Trend percentage/text[m
+[31m-- `description` - Optional description[m
+[3

@@ -19,8 +19,6 @@ import Dashboard from './pages/Dashboard';
 import VendorRegistrationMultiStep from './pages/VendorRegistrationMultiStep';
 import VendorDashboard from './pages/VendorDashboard';
 import AdminPanel from './pages/AdminPanel';
-import AdminDashboardNew from './pages/AdminDashboardNew';
-import AdminDebugPanel from './pages/AdminDebugPanel';
 import UserDashboardNew from './pages/UserDashboardNew';
 import About from './pages/About';
 import HowItWorksPage from './pages/HowItWorks';
@@ -72,7 +70,7 @@ function App() {
                   } 
                 />
                 
-                {/* Protected Admin Panel - requires admin role */}
+                {/* Admin Panel - Production Version with All Features */}
                 <Route 
                   path="/admin" 
                   element={
@@ -81,19 +79,6 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                
-                {/* New Admin Dashboard */}
-                <Route 
-                  path="/admin/dashboard" 
-                  element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminDashboardNew />
-                    </ProtectedRoute>
-                  } 
-                />
-                
-                {/* Admin Debug Panel - public for troubleshooting */}
-                <Route path="/admin/debug" element={<AdminDebugPanel />} />
                 
                 {/* Vendor routes - separate from user/admin authentication */}
                 <Route path="/vendor-registration" element={<VendorRegistrationMultiStep />} />

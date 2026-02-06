@@ -12,6 +12,20 @@ const apiClient = axios.create({
   },
 });
 
+// Request interceptor to add auth token
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Response interceptor for consistent error handling
 apiClient.interceptors.response.use(
   (response) => response.data,
@@ -233,6 +247,67 @@ export const deleteInquiry = async (inquiryId) => {
 };
 
 /**
+ * ADMIN: Fetch pending inquiries awaiting approval
+ * @param {Object} params - Query parameters (page, limit)
+ * @returns {Promise<Object>} Object with inquiries array and pagination
+ */
+export const fetchPendingInquiries = async (params = {}) => {
+  try {
+    const queryParams = new URLSearchParams(params).toString();
+    const response = await apiClient.get(`/admin/inquiries/pending?${queryParams}`);
+    return response.success ? response.data : { inquiries: [], total: 0 };
+  } catch (error) {
+    console.error('Error fetching pending inquiries:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Approve an inquiry (allows vendor to see it)
+ * @param {string} inquiryId - Inquiry ID
+ * @returns {Promise<Object>} Approved inquiry object
+ */
+export const approveInquiry = async (inquiryId) => {
+  try {
+    const response = await apiClient.post(`/admin/inquiries/${inquiryId}/approve`);
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error approving inquiry:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Reject an inquiry with reason (vendor won't see it)
+ * @param {string} inquiryId - Inquiry ID
+ * @param {string} reason - Rejection reason
+ * @returns {Promise<Object>} Rejected inquiry object
+ */
+export const rejectInquiry = async (inquiryId, reason) => {
+  try {
+    const response = await apiClient.post(`/admin/inquiries/${inquiryId}/reject`, { reason });
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error rejecting inquiry:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Get inquiry approval statistics
+ * @returns {Promise<Object>} Statistics object with pending, approved, rejected counts
+ */
+export const fetchInquiryApprovalStats = async () => {
+  try {
+    const response = await apiClient.get('/admin/inquiries/approval-stats');
+    return response.success ? response.data : { pending: 0, approved: 0, rejected: 0, total: 0 };
+  } catch (error) {
+    console.error('Error fetching approval stats:', error);
+    throw error;
+  }
+};
+
+/**
  * Create a new vendor
  * @param {Object} vendorData - Vendor information
  * @returns {Promise<Object>} Created vendor object
@@ -274,6 +349,246 @@ export const deleteVendor = async (vendorId) => {
     return response;
   } catch (error) {
     console.error('Error deleting vendor:', error);
+    throw error;
+  }
+};
+
+// ==========================================
+// ADDITIONAL ADMIN API ENDPOINTS
+// ==========================================
+
+/**
+ * ADMIN: Get dashboard statistics
+ * @returns {Promise<Object>} Dashboard stats
+ */
+export const fetchAdminStats = async () => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.get('/admin/stats', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Get recent activity
+ * @param {number} limit - Number of items to fetch
+ * @returns {Promise<Object>} Recent activity data
+ */
+export const fetchRecentActivity = async (limit = 10) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.get(`/admin/activity?limit=${limit}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error fetching recent activity:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Get all users
+ * @param {Object} params - Query parameters
+ * @returns {Promise<Object>} Users data
+ */
+export const fetchAllUsers = async (params = {}) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const queryString = new URLSearchParams(params).toString();
+    const response = await apiClient.get(`/admin/users?${queryString}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Update user status
+ * @param {string} userId - User ID
+ * @param {Object} updates - Status updates (isActive, role)
+ * @returns {Promise<Object>} Updated user
+ */
+export const updateUserStatus = async (userId, updates) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.patch(`/admin/users/${userId}`, updates, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error updating user status:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Get all vendors
+ * @param {Object} params - Query parameters
+ * @returns {Promise<Object>} Vendors data
+ */
+export const fetchAllVendorsAdmin = async (params = {}) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const queryString = new URLSearchParams(params).toString();
+    const response = await apiClient.get(`/admin/vendors?${queryString}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    console.log('API Response:', response);
+    return response;
+  } catch (error) {
+    console.error('Error fetching vendors:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Toggle vendor verification status
+ * @param {string} vendorId - Vendor ID
+ * @param {boolean} verified - Verification status
+ * @returns {Promise<Object>} Updated vendor
+ */
+export const toggleVendorVerification = async (vendorId, verified) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.patch(
+      `/admin/vendors/${vendorId}/verify`,
+      { verified },
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error toggling vendor verification:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Toggle vendor active status (hide/show)
+ * @param {string} vendorId - Vendor ID
+ * @param {boolean} isActive - Active status
+ * @returns {Promise<Object>} Updated vendor
+ */
+export const toggleVendorStatus = async (vendorId, isActive) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.patch(
+      `/admin/vendors/${vendorId}/status`,
+      { isActive },
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error toggling vendor status:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Delete vendor permanently
+ * @param {string} vendorId - Vendor ID
+ * @returns {Promise<Object>} Delete confirmation
+ */
+export const deleteVendorPermanent = async (vendorId) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.delete(`/admin/vendors/${vendorId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response;
+  } catch (error) {
+    console.error('Error deleting vendor:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Forward inquiry to different vendor
+ * @param {string} inquiryId - Inquiry ID
+ * @param {string} newVendorId - New vendor ID
+ * @param {string} reason - Reason for forwarding
+ * @returns {Promise<Object>} Updated inquiry
+ */
+export const forwardInquiry = async (inquiryId, newVendorId, reason) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.post(
+      `/admin/inquiries/${inquiryId}/forward`,
+      { newVendorId, reason },
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    return response;
+  } catch (error) {
+    console.error('Error forwarding inquiry:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Toggle inquiry active/inactive status
+ * @param {string} inquiryId - Inquiry ID
+ * @param {boolean} isActive - Active status
+ * @returns {Promise<Object>} Updated inquiry
+ */
+export const toggleInquiryActive = async (inquiryId, isActive) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.patch(
+      `/admin/inquiries/${inquiryId}/toggle-active`,
+      { isActive },
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    return response;
+  } catch (error) {
+    console.error('Error toggling inquiry status:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Get all inquiries
+ * @param {Object} params - Query parameters
+ * @returns {Promise<Object>} Inquiries data
+ */
+export const fetchAllInquiriesAdmin = async (params = {}) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const queryString = new URLSearchParams(params).toString();
+    const response = await apiClient.get(`/admin/inquiries?${queryString}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error fetching inquiries:', error);
+    throw error;
+  }
+};
+
+/**
+ * ADMIN: Update inquiry status
+ * @param {string} inquiryId - Inquiry ID
+ * @param {Object} updates - Status updates
+ * @returns {Promise<Object>} Updated inquiry
+ */
+export const updateInquiryStatusAdmin = async (inquiryId, updates) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.patch(
+      `/admin/inquiries/${inquiryId}`,
+      updates,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error updating inquiry:', error);
     throw error;
   }
 };

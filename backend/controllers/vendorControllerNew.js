@@ -52,10 +52,14 @@ exports.loginVendor = async (req, res, next) => {
         }
       });
     }
-    
-    // Return vendor data (without password)
+
+    // Generate JWT token
+    const token = vendor.generateAuthToken();
+
+    // Return vendor data with token
     res.status(200).json({
       success: true,
+      token,
       data: {
         vendorId: vendor.vendorId,
         _id: vendor._id,
@@ -68,7 +72,8 @@ exports.loginVendor = async (req, res, next) => {
         verified: vendor.verified,
         isActive: vendor.isActive,
         rating: vendor.rating,
-        reviewCount: vendor.reviewCount
+        reviewCount: vendor.reviewCount,
+        role: 'vendor'
       },
       message: 'Login successful'
     });

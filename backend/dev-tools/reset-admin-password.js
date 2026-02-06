@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const User = require('./models/User');
+const User = require('../models/User');
 require('dotenv').config();
 
 const resetAdminPassword = async () => {
@@ -8,7 +8,7 @@ const resetAdminPassword = async () => {
     console.log('🔄 Connecting to MongoDB...');
     
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/event-management');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/event-management');
     console.log('✅ Connected to MongoDB\n');
 
     // Find admin user

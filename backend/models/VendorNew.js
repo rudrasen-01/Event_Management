@@ -392,6 +392,21 @@ vendorSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Generate JWT token
+vendorSchema.methods.generateAuthToken = function() {
+  const jwt = require('jsonwebtoken');
+  return jwt.sign(
+    { 
+      id: this._id,
+      vendorId: this.vendorId,
+      role: 'vendor',
+      email: this.contact.email
+    },
+    process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+    { expiresIn: '30d' }
+  );
+};
+
 // Hash password before saving
 vendorSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {

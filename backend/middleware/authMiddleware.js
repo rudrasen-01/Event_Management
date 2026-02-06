@@ -5,6 +5,7 @@
 
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Vendor = require('../models/VendorNew');
 
 /**
  * Protect routes - verify JWT token
@@ -36,8 +37,19 @@ const protect = async (req, res, next) => {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
       
-      // Get user from token
-      const user = await User.findById(decoded.id).select('-password');
+      let user;
+      
+      // Check if it's a vendor token
+      if (decoded.role === 'vendor') {
+        user = await Vendor.findById(decoded.id).select('-password');
+        if (user) {
+          user.role = 'vendor';
+          user.vendorId = user.vendorId || user._id;
+        }
+      } else {
+        // Try to find as regular user
+        user = await User.findById(decoded.id).select('-password');
+      }
       
       if (!user) {
         return res.status(401).json({
@@ -49,7 +61,7 @@ const protect = async (req, res, next) => {
         });
       }
       
-      // Check if user is active
+      // Check if user/vendor is active
       if (!user.isActive) {
         return res.status(403).json({
           success: false,
