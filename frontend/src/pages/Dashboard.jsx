@@ -198,7 +198,7 @@ const Dashboard = () => {
 
             {/* Budget Range */}
             <div className="md:col-span-3">
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                 <DollarSign className="w-4 h-4 text-green-600" />
                 Budget: ₹{budgetRange[0].toLocaleString()} - ₹{budgetRange[1].toLocaleString()}
               </label>
@@ -222,7 +222,7 @@ const Dashboard = () => {
 
             {/* Radius */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                 <MapPin className="w-4 h-4 text-blue-600" />
                 Radius: {radius} km
               </label>
@@ -326,7 +326,7 @@ const Dashboard = () => {
                     userLocation={userLocation}
                     prefilledEventType={selectedSubCategory}
                     onInquiry={(vendor) => {
-                      console.log('Opening inquiry for:', vendor.name);
+                      // Inquiry handled by VendorCard
                     }}
                   />
                 ))}

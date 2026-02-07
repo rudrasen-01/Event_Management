@@ -1,14 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { generateFilters } from '../services/filterGenerator';
 
 /**
- * SERVICE CONTEXT - WORLD-CLASS FILTER MANAGEMENT
+ * SERVICE CONTEXT - LEGACY COMPATIBILITY
  * 
- * Intelligent context-aware filtering system
- * Adapts filters based on search intent, category, and user context
+ * Note: This context is maintained for backward compatibility with DynamicSearchPage.
+ * New pages should use the marketplace filter system (MarketplaceFilterPanel + filterUtils).
  */
 
 const ServiceContext = createContext();
+
+// Stub filter generator for backward compatibility
+const generateFilters = (context) => {
+  // Return empty schema - filters now come from backend API
+  return {
+    universal: [],
+    specific: [],
+    hierarchy: {}
+  };
+};
 
 export const useService = () => {
   const context = useContext(ServiceContext);

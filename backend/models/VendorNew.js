@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const ServiceKeywords = require('./ServiceKeywords');
 
 const portfolioImageSchema = new mongoose.Schema({
   url: { type: String, required: true },
@@ -409,11 +410,54 @@ vendorSchema.methods.generateAuthToken = function() {
 
 // Hash password before saving
 vendorSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
+  // 1. Hash password if modified
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
   }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  
+  // 2. Auto-populate searchKeywords dynamically from database
+  if (this.isModified('serviceType') || this.isModified('name') || this.isModified('businessName') || !this.searchKeywords || this.searchKeywords.length === 0) {
+    const keywords = new Set();
+    
+    // Fetch service-specific keywords from database
+    if (this.serviceType) {
+      const serviceType = this.serviceType.toLowerCase();
+      keywords.add(serviceType);
+      
+      try {
+        // Fetch keywords dynamically from ServiceKeywords collection
+        const serviceKeywords = await ServiceKeywords.getKeywordsForService(serviceType);
+        serviceKeywords.forEach(keyword => keywords.add(keyword.toLowerCase()));
+      } catch (error) {
+        console.error('⚠️  Failed to fetch service keywords from database:', error.message);
+        // Continue without service keywords if fetch fails
+      }
+    }
+    
+    // Add name variations
+    if (this.name) {
+      const nameParts = this.name.toLowerCase().split(/\s+/);
+      nameParts.forEach(part => {
+        if (part.length > 2) keywords.add(part);
+      });
+    }
+    
+    // Add business name variations
+    if (this.businessName) {
+      const businessParts = this.businessName.toLowerCase().split(/\s+/);
+      businessParts.forEach(part => {
+        if (part.length > 2) keywords.add(part);
+      });
+    }
+    
+    // Add city and area for location-based searches
+    if (this.city) keywords.add(this.city.toLowerCase());
+    if (this.area) keywords.add(this.area.toLowerCase());
+    
+    this.searchKeywords = Array.from(keywords);
+  }
+  
   next();
 });
 
@@ -443,24 +487,55 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   console.log('🔍 VendorModel.comprehensiveSearch - Building query...');
   
   let query = { isActive: true };
+  let useTextScore = false;
   
-  console.log('🔍 Search:', { serviceType, city: location?.city, verified, rating });
+  console.log('🔍 Search:', { searchQuery, serviceType, city: location?.city, verified, rating });
   
   // VERIFIED FILTER
   if (verified !== undefined) {
     query.verified = verified;
   }
   
-  // TEXT SEARCH
+  // COMPREHENSIVE TEXT SEARCH - Use regex for flexible partial matching
+  // This approach works better for real-time search as users type
   if (searchQuery && searchQuery.trim()) {
-    query.$text = { 
-      $search: searchQuery.trim(),
-      $caseSensitive: false
-    };
+    const searchTerm = searchQuery.trim();
+    
+    // Create flexible regex that handles spaces, hyphens, and partial matches
+    // "Corporate Event Photography" matches "corporate-event-photography"
+    // "photography" matches "photographer", "photography", "photo"
+    const flexibleTerm = searchTerm
+      .replace(/\s+/g, '[-\\s]*')  // Spaces can be spaces or hyphens
+      .replace(/[^a-zA-Z0-9\-\s*]/g, ''); // Remove special chars except hyphen
+    const searchRegex = new RegExp(flexibleTerm, 'i'); // Case-insensitive
+    
+    // Also create a simple partial match for single words
+    const simpleTerm = searchTerm.split(/\s+/)[0]; // First word
+    const simpleRegex = new RegExp(simpleTerm, 'i');
+    
+    // Build OR condition to search across multiple fields
+    // Using regex allows partial matching: "photo" matches "photography", "photographer"
+    const searchConditions = [
+      { name: searchRegex },
+      { businessName: searchRegex },
+      { contactPerson: searchRegex },
+      { description: searchRegex },
+      { searchKeywords: simpleRegex }, // Use simple regex for keywords array
+      { serviceType: searchRegex },
+      { city: simpleRegex },
+      { area: simpleRegex }
+    ];
+    
+    query.$or = searchConditions;
+    
+    console.log('   Text search:', searchTerm, '(multi-field flexible regex match)');
+    console.log('   Flexible pattern:', flexibleTerm);
   }
   
   // SERVICE TYPE FILTER (Case-insensitive partial match)
-  if (serviceType) {
+  // Only apply if explicitly provided AND no search query
+  // When user types text, let the regex search in $or handle serviceType matching
+  if (serviceType && !searchQuery) {
     // Normalize and create flexible regex pattern
     const normalizedService = serviceType.toLowerCase().trim();
     
@@ -471,6 +546,8 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
     
     console.log('   Service type filter:', normalizedService, '(partial match)');
   }
+  // NOTE: If both searchQuery and serviceType exist, serviceType is already
+  // included in the $or conditions above, so no need to add it as AND condition
   
   // LOCATION
   if (location) {
@@ -560,33 +637,30 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   
   // SORTING STRATEGY
   let sortOption = {};
-  if (searchQuery && query.$text) {
-    // Text search: sort by text score (relevance) first
-    sortOption = { score: { $meta: 'textScore' }, rating: -1, popularityScore: -1 };
-  } else {
-    switch (sort) {
-      case 'rating':
-        sortOption = { rating: -1, reviewCount: -1 };
-        break;
-      case 'price-low':
-        sortOption = { 'pricing.average': 1, rating: -1 };
-        break;
-      case 'price-high':
-        sortOption = { 'pricing.average': -1, rating: -1 };
-        break;
-      case 'reviews':
-        sortOption = { reviewCount: -1, rating: -1 };
-        break;
-      case 'distance':
-        // Distance sorting is automatic with $near geospatial query
-        sortOption = { rating: -1 };
-        break;
-      case 'popularity':
-        sortOption = { popularityScore: -1, rating: -1 };
-        break;
-      default: // 'relevance'
-        sortOption = { isFeatured: -1, rating: -1, popularityScore: -1 };
-    }
+  // Note: We use regex search instead of $text, so no text score available
+  // Sort by relevance factors: featured status, rating, popularity
+  switch (sort) {
+    case 'rating':
+      sortOption = { rating: -1, reviewCount: -1 };
+      break;
+    case 'price-low':
+      sortOption = { 'pricing.average': 1, rating: -1 };
+      break;
+    case 'price-high':
+      sortOption = { 'pricing.average': -1, rating: -1 };
+      break;
+    case 'reviews':
+      sortOption = { reviewCount: -1, rating: -1 };
+      break;
+    case 'distance':
+      // Distance sorting is automatic with $near geospatial query
+      sortOption = { rating: -1 };
+      break;
+    case 'popularity':
+      sortOption = { popularityScore: -1, rating: -1 };
+      break;
+    default: // 'relevance'
+      sortOption = { isFeatured: -1, rating: -1, popularityScore: -1 };
   }
   
   // PAGINATION

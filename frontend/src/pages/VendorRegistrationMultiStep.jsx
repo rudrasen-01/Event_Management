@@ -6,7 +6,7 @@ import {
   Calendar, Shield, Check, AlertCircle
 } from 'lucide-react';
 import { CITIES } from '../utils/constants';
-import { fetchServicesByCategory } from '../services/api';
+import { getAllServices } from '../services/taxonomyService';
 import VendorLoginModal from '../components/VendorLoginModal';
 
 const VendorRegistrationMultiStep = () => {
@@ -62,12 +62,19 @@ const VendorRegistrationMultiStep = () => {
     setSuccess(false);
     setCategorySearch('');
     
-    // Fetch services from backend - Single Source of Truth
+    // Fetch services from master taxonomy - Single Source of Truth
     const loadServices = async () => {
       setServicesLoading(true);
       try {
-        const services = await fetchServicesByCategory();
-        setVendorServices(services);
+        const services = await getAllServices();
+        // Format for vendor registration: { value: taxonomyId, label: name, icon, category: parentId }
+        const formattedServices = services.map(service => ({
+          value: service.taxonomyId,
+          label: service.name,
+          icon: service.icon || '🔧',
+          category: service.parentId || 'other'
+        }));
+        setVendorServices(formattedServices);
       } catch (err) {
         console.error('Failed to load services:', err);
         setError('Failed to load business categories. Please refresh the page.');

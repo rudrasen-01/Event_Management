@@ -42,7 +42,7 @@ if (fs.existsSync(devToolsPath)) {
 const scriptsPath = path.join(__dirname, 'scripts');
 if (fs.existsSync(scriptsPath)) {
   const scriptFiles = fs.readdirSync(scriptsPath).filter(f => f.endsWith('.js'));
-  const allowedScripts = ['seed-services.js', 'seed-admin.js'];
+  const allowedScripts = ['seed-admin.js'];
   const unauthorizedScripts = scriptFiles.filter(f => !allowedScripts.includes(f));
   
   if (unauthorizedScripts.length > 0) {

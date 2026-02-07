@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, ArrowRight, Sparkles, Crosshair, Search, ChevronDown, Star, Shield, TrendingUp, Award, Compass, Loader2 } from 'lucide-react';
 import { AREAS_BY_CITY } from '../utils/constants';
 import { useSearch } from '../contexts/SearchContext';
-import { fetchCities, fetchServiceTypes, fetchSearchSuggestions } from '../services/dynamicDataService';
+import { fetchCities, fetchServiceTypes } from '../services/dynamicDataService';
+import SearchAutocomplete from './SearchAutocomplete';
 
 const EventSearch = () => {
   const navigate = useNavigate();
@@ -63,39 +64,13 @@ const EventSearch = () => {
     loadData();
   }, []);
 
-  // Generate category menu from service types
+  // Generate menu from service types - NO hardcoded categorization
   const categoryMegaMenu = React.useMemo(() => {
     if (!serviceTypes.length) return {};
     
-    // Group service types into categories
-    const categories = {
-      'Venues': [],
-      'Planning & Decor': [],
-      'Photographers': [],
-      'Food & Catering': [],
-      'Music & Entertainment': []
-    };
-    
-    serviceTypes.forEach(service => {
-      const serviceLower = service.label.toLowerCase();
-      
-      if (serviceLower.includes('venue') || serviceLower.includes('hall') || serviceLower.includes('garden') || serviceLower.includes('resort') || serviceLower.includes('hotel')) {
-        categories['Venues'].push({ label: service.label, icon: '🏛️', value: service.value });
-      } else if (serviceLower.includes('planner') || serviceLower.includes('decorator') || serviceLower.includes('mehendi') || serviceLower.includes('choreograph') || serviceLower.includes('invitation')) {
-        categories['Planning & Decor'].push({ label: service.label, icon: '📋', value: service.value });
-      } else if (serviceLower.includes('photo') || serviceLower.includes('video') || serviceLower.includes('candid')) {
-        categories['Photographers'].push({ label: service.label, icon: '📸', value: service.value });
-      } else if (serviceLower.includes('cater') || serviceLower.includes('cake') || serviceLower.includes('food') || serviceLower.includes('bar')) {
-        categories['Food & Catering'].push({ label: service.label, icon: '🍽️', value: service.value });
-      } else if (serviceLower.includes('dj') || serviceLower.includes('band') || serviceLower.includes('anchor') || serviceLower.includes('music') || serviceLower.includes('entertainment')) {
-        categories['Music & Entertainment'].push({ label: service.label, icon: '🎵', value: service.value });
-      }
-    });
-    
-    // Remove empty categories
-    return Object.fromEntries(
-      Object.entries(categories).filter(([_, items]) => items.length > 0)
-    );
+    // Simply return services without hardcoded categorization
+    // Categorization logic should come from database, not hardcoded here
+    return {};
   }, [serviceTypes]);
 
   const popularSearches = React.useMemo(() => {
@@ -366,87 +341,24 @@ const EventSearch = () => {
                   </button>
                 </div>
 
-                {/* Search Input with Autocomplete */}
+                {/* Search Input with Smart Autocomplete */}
                 <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSearchQuery(val);
-                      setShowSuggestions(val.length > 0);
-                      if (val.length >= 1) {
-                        const s = getSuggestedServices(val);
-                        setSuggestions(s);
-                      } else {
-                        setSuggestions([]);
-                      }
-                    }}
-                    onFocus={() => {
-                      setShowSuggestions(true);
-                      if (searchQuery.length > 0) setSuggestions(getSuggestedServices(searchQuery));
-                    }}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                    placeholder="Search for Venues, Photographers, Singers, DJs, Anchors..."
-                    className="w-full px-4 py-3 text-sm focus:outline-none"
-                  />
-
-                  {/* Autocomplete Dropdown */}
-                  {showSuggestions && (
-                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b-lg shadow-2xl z-50 max-h-96 overflow-y-auto mt-0.5">
-                      {suggestions && suggestions.length > 0 && (
-                        <div className="p-2 border-b border-gray-100">
-                          <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2">Suggestions</div>
-                          {suggestions.map((sug, i) => (
-                            <button
-                              key={`sug-${i}`}
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                setSearchQuery(sug.serviceName);
-                                setShowSuggestions(false);
-                                setSuggestions([]);
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 rounded text-left transition-colors"
-                            >
-                              <span className="text-xl">{sug.icon}</span>
-                              <div className="flex-1">
-                                <div className="text-sm font-medium text-gray-900">{sug.serviceName}</div>
-                                <div className="text-xs text-gray-500">Related</div>
-                              </div>
-                              <ArrowRight className="w-4 h-4 text-gray-400" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="p-2">
-                        <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2 border-b border-gray-100">
-                          Popular Searches
-                        </div>
-                        {popularSearches
-                          .filter(s => !searchQuery || s.text.toLowerCase().includes(searchQuery.toLowerCase()))
-                          .map((suggestion, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                handleSuggestionClick(suggestion);
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 rounded text-left transition-colors"
-                            >
-                              <span className="text-xl">{suggestion.icon}</span>
-                              <div className="flex-1">
-                                <div className="text-sm font-medium text-gray-900">{suggestion.text}</div>
-                                <div className="text-xs text-gray-500">Category: {suggestion.category}</div>
-                              </div>
-                              <ArrowRight className="w-4 h-4 text-gray-400" />
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
+                  <div className="absolute inset-0">
+                    <SearchAutocomplete
+                      onSelect={(suggestion) => {
+                        setSearchQuery(suggestion.label);
+                        // Store taxonomy ID for filtering
+                        if (suggestion.taxonomyId) {
+                          updateFilter('serviceId', suggestion.taxonomyId);
+                        }
+                      }}
+                      onInputChange={(value) => {
+                        setSearchQuery(value);
+                      }}
+                      placeholder="Search for Venues, Photographers, Singers, DJs, Anchors..."
+                      showIcon={false}
+                    />
+                  </div>
                 </div>
 
                 {/* Search Button */}
@@ -475,7 +387,6 @@ const EventSearch = () => {
 
           {/* Category Browse Dropdowns - Professional Style */}
           <div className="flex items-center justify-center gap-4 flex-wrap">
-            <span className="text-sm text-gray-600 font-medium">Browse by:</span>
             {Object.keys(categoryMegaMenu).map((category, idx) => (
               <div 
                 key={idx} 

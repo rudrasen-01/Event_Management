@@ -100,8 +100,6 @@ const SearchResults = () => {
         limit: 20
       };
 
-      console.log('🔍 SearchResults - Loading vendors with filters:', searchFilters);
-
       const response = await fetchVendors(searchFilters);
       
       // Use only database-driven results - no mock data fallback
@@ -111,11 +109,6 @@ const SearchResults = () => {
       setTotalVendors(response.total || vendorsList.length);
       setSolutions(buildSolutionsFromVendors(vendorsList));
       
-      // Log when no vendors found for debugging
-      if (vendorsList.length === 0) {
-        console.log('ℹ️ No vendors found for current filters. Database returned 0 results.');
-        console.log('Applied filters:', searchFilters);
-      }
     } catch (error) {
       console.error('❌ Error loading vendors:', error);
       // Show empty state on error - no mock data

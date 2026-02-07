@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const keywordController = require('../controllers/keywordController');
 const { adminOnly } = require('../middleware/adminMiddleware');
 
 // All routes protected by adminOnly middleware
@@ -117,5 +118,53 @@ router.post('/inquiries/:inquiryId/forward', adminController.forwardInquiry);
  * @access  Admin
  */
 router.patch('/inquiries/:inquiryId/toggle-active', adminController.toggleInquiryActive);
+
+// ====================================
+// SERVICE KEYWORDS MANAGEMENT
+// ====================================
+
+/**
+ * @route   GET /api/admin/keywords
+ * @desc    Get all service keyword patterns
+ * @access  Admin
+ */
+router.get('/keywords', keywordController.getAllKeywords);
+
+/**
+ * @route   GET /api/admin/keywords/:servicePattern
+ * @desc    Get keywords for specific service pattern
+ * @access  Admin
+ */
+router.get('/keywords/:servicePattern', keywordController.getKeywordsByService);
+
+/**
+ * @route   POST /api/admin/keywords
+ * @desc    Add or update keyword pattern
+ * @access  Admin
+ * @body    { servicePattern, keywords, description, priority }
+ */
+router.post('/keywords', keywordController.addOrUpdateKeywords);
+
+/**
+ * @route   DELETE /api/admin/keywords/:id
+ * @desc    Delete keyword pattern
+ * @access  Admin
+ */
+router.delete('/keywords/:id', keywordController.deleteKeywords);
+
+/**
+ * @route   POST /api/admin/keywords/suggest
+ * @desc    Get keyword suggestions for a service type
+ * @access  Admin
+ * @body    { serviceType }
+ */
+router.post('/keywords/suggest', keywordController.getKeywordSuggestions);
+
+/**
+ * @route   POST /api/admin/keywords/regenerate
+ * @desc    Regenerate keywords for all vendors
+ * @access  Admin
+ */
+router.post('/keywords/regenerate', keywordController.regenerateAllVendorKeywords);
 
 module.exports = router;

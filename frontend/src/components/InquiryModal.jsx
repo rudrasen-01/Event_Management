@@ -236,14 +236,9 @@ const InquiryModal = ({
 
     // Top-level guard so unexpected runtime errors during submit don't bubble
     try {
-      console.log('🔍 Step 1: Form submitted');
-      console.log('🔍 formData:', JSON.stringify(formData, null, 2));
-      
       let isValid = false;
       try {
-        console.log('🔍 Step 2: Starting validation');
         isValid = validateForm();
-        console.log('🔍 Step 3: Validation result:', isValid);
       } catch (vErr) {
         console.error('❌ Validation error:', vErr);
         console.error('❌ Stack:', vErr.stack);
@@ -252,7 +247,6 @@ const InquiryModal = ({
       }
 
       if (!isValid) {
-        console.log('🔍 Validation failed, showing errors');
         setNotification({
           type: 'error',
           message: 'Please fix the errors in the form'
@@ -260,7 +254,6 @@ const InquiryModal = ({
         return;
       }
 
-      console.log('🔍 Step 4: Building inquiry data');
       setLoading(true);
       setNotification(null);
 
@@ -283,8 +276,6 @@ const InquiryModal = ({
         status: 'pending'
       };
 
-      console.log('✅ Submitting inquiry:', inquiryData);
-
       const response = await fetch('http://localhost:5000/api/inquiries', {
         method: 'POST',
         headers: {
@@ -292,16 +283,12 @@ const InquiryModal = ({
         },
         body: JSON.stringify(inquiryData)
       });
-
-      console.log('🔍 Step 5: Got response, status:', response.status, response.ok);
       
       // Safe response parsing
       let data;
       try {
         const responseText = await response.text();
-        console.log('🔍 Step 6: Response text:', responseText);
         data = responseText ? JSON.parse(responseText) : {};
-        console.log('🔍 Step 7: Parsed data:', data);
       } catch (parseErr) {
         console.error('❌ JSON parse error:', parseErr);
         throw new Error('Invalid server response');

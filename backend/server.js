@@ -26,6 +26,7 @@ const inquiryRoutes = require('./routes/inquiryRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const dynamicRoutes = require('./routes/dynamicRoutes');
+const taxonomyRoutes = require('./routes/taxonomyRoutes');
 
 // Use Routes
 app.use('/api/services', serviceRoutes);
@@ -35,6 +36,7 @@ app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/dynamic', dynamicRoutes); // Dynamic data endpoints
+app.use('/api/taxonomy', taxonomyRoutes); // Master taxonomy system
 
 // Detect service intent endpoint (special case - not under /services)
 const { detectServiceIntent } = require('./controllers/serviceController');
@@ -57,6 +59,15 @@ app.get('/', (req, res) => {
         profile: 'GET /api/users/profile',
         updateProfile: 'PUT /api/users/profile',
         logout: 'POST /api/users/logout'
+      },
+      taxonomy: {
+        categories: 'GET /api/taxonomy/categories',
+        subcategories: 'GET /api/taxonomy/subcategories?categoryId=xxx',
+        services: 'GET /api/taxonomy/services?subcategoryId=xxx',
+        allServices: 'GET /api/taxonomy/services/all',
+        search: 'GET /api/taxonomy/search?q=keyword',
+        hierarchy: 'GET /api/taxonomy/hierarchy',
+        byId: 'GET /api/taxonomy/:taxonomyId'
       },
       services: {
         getAll: 'GET /api/services',

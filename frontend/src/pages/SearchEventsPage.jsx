@@ -6,11 +6,12 @@ import {
 } from 'lucide-react';
 import VendorCard from '../components/VendorCard';
 import { fetchVendors } from '../services/api';
-import { fetchServiceTypes, fetchCities, fetchSearchSuggestions } from '../services/dynamicDataService';
+import { fetchServiceTypes, fetchCities } from '../services/dynamicDataService';
 import { formatCurrency } from '../utils/format';
 import { AREAS_BY_CITY } from '../utils/constants';
 import { getSuggestedServices } from '../services/filterService';
 import { useSearch } from '../contexts/SearchContext';
+import SearchAutocomplete from '../components/SearchAutocomplete';
 
 const SearchEventsPage = () => {
   const navigate = useNavigate();
@@ -418,142 +419,23 @@ const SearchEventsPage = () => {
       <div className="bg-white border-b sticky top-16 md:top-20 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-            <div className="flex-1 relative order-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSearchQuery(val);
-                  setShowSuggestions(val.length > 0);
-                  if (val.length >= 1) {
-                    const s = getSuggestedServices(val);
-                    setSuggestions(s);
-                  } else {
-                    setSuggestions([]);
+            <div className="flex-1 order-1">
+              <SearchAutocomplete
+                onSelect={(suggestion) => {
+                  setSearchQuery(suggestion.label);
+                  if (suggestion.taxonomyId) {
+                    updateFilter('serviceId', suggestion.taxonomyId);
                   }
+                  setShowSuggestions(false);
                 }}
-                onFocus={() => {
-                  setShowSuggestions(true);
-                  if (searchQuery.length > 0) setSuggestions(getSuggestedServices(searchQuery));
+                onInputChange={(value) => {
+                  setSearchQuery(value);
                 }}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 placeholder="Search for event services, venues, photographers..."
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-sm text-sm
-                         focus:outline-none focus:border-blue-500 focus:shadow-sm"
+                showIcon={true}
+                debounceMs={200}
+                maxSuggestions={15}
               />
-              
-              {/* Autocomplete Dropdown */}
-              {showSuggestions && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b shadow-2xl z-[60] max-h-96 overflow-y-auto mt-0.5">
-                  {/* Live Vendor Matches */}
-                  {liveVendorSuggestions && liveVendorSuggestions.length > 0 && (
-                    <div className="p-2 border-b border-gray-100">
-                      <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2 flex items-center gap-2">
-                        <Shield className="w-3 h-3" />
-                        Matching Vendors
-                      </div>
-                      {liveVendorSuggestions.map((vendor, i) => (
-                        <button
-                          key={`vendor-${vendor._id || i}`}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setSearchQuery(vendor.businessName || vendor.name);
-                            setShowSuggestions(false);
-                            // Optionally navigate to vendor detail
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-green-50 rounded text-left transition-colors border-b border-gray-50"
-                        >
-                          <div className="w-10 h-10 rounded bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center flex-shrink-0">
-                            <span className="text-lg">\ud83c\udfea</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-gray-900 truncate">
-                              {vendor.businessName || vendor.name}
-                            </div>
-                            <div className="text-xs text-gray-600 flex items-center gap-2">
-                              <span>{vendor.serviceType || vendor.category}</span>
-                              {vendor.city && (
-                                <>
-                                  <span>\u2022</span>
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" />
-                                    {vendor.city}
-                                  </span>
-                                </>
-                              )}
-                              {vendor.verified && (
-                                <>
-                                  <span>\u2022</span>
-                                  <Shield className="w-3 h-3 text-green-600" />
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-gray-400" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Service Suggestions */}
-                  {suggestions && suggestions.length > 0 && (
-                    <div className="p-2 border-b border-gray-100">
-                      <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2">Service Types</div>
-                      {suggestions.map((sug, i) => (
-                        <button
-                          key={`sug-${i}`}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setSearchQuery(sug.serviceName);
-                            setShowSuggestions(false);
-                            setSuggestions([]);
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 rounded text-left transition-colors"
-                        >
-                          <span className="text-xl">{sug.icon}</span>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">{sug.serviceName}</div>
-                            <div className="text-xs text-gray-500">Service Category</div>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-gray-400" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Popular Searches */}
-                  <div className="p-2">
-                    <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2 border-b border-gray-100">
-                      Popular Searches
-                    </div>
-                    {popularSearches
-                      .filter(s => !searchQuery || s.text.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .slice(0, 5)
-                      .map((suggestion, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setSearchQuery(suggestion.text);
-                            setShowSuggestions(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 rounded text-left transition-colors"
-                        >
-                          <span className="text-xl">{suggestion.icon}</span>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">{suggestion.text}</div>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-gray-400" />
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
             </div>
             {/* Location Input with City/Area Dropdowns */}
             <div className="w-full sm:w-80 relative flex items-center gap-2 px-3 py-2.5 border border-gray-300 rounded-sm bg-white order-2">
@@ -739,7 +621,7 @@ const SearchEventsPage = () => {
                     {expandedSections.eventType ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
                   {expandedSections.eventType && (
-                    <div className="px-4 pb-3 space-y-2">
+                    <div className="px-4 pb-3 space-y-2 max-h-80 overflow-y-auto">
                       {loadingFilters ? (
                         <div className="text-center py-3">
                           <Loader2 className="w-5 h-5 animate-spin inline-block text-blue-600" />
@@ -926,37 +808,6 @@ const SearchEventsPage = () => {
                     </div>
                   )}
                 </div>
-
-                {/* Service Types */}
-                <div className="border-b border-gray-200">
-                  <button
-                    onClick={() => toggleSection('services')}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
-                  >
-                    <span className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Service Types</span>
-                    {expandedSections.services ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  {expandedSections.services && (
-                    <div className="px-4 pb-3 space-y-2 max-h-64 overflow-y-auto">
-                      {serviceTypes.map(service => (
-                        <label key={service.value} className="flex items-center gap-2 cursor-pointer group">
-                          <input
-                            type="checkbox"
-                            checked={filters.services.includes(service.value)}
-                            onChange={(e) => {
-                              const newServices = e.target.checked
-                                ? [...filters.services, service.value]
-                                : filters.services.filter(s => s !== service.value);
-                              handleFilterChange('services', newServices);
-                            }}
-                            className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-1 focus:ring-blue-500"
-                          />
-                          <span className="text-sm text-gray-700 group-hover:text-gray-900">{service.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </aside>
@@ -1054,17 +905,6 @@ const SearchEventsPage = () => {
                         </button>
                       </span>
                     )}
-                    {filters.services.map(serviceValue => {
-                      const service = serviceTypes.find(s => s.value === serviceValue);
-                      return (
-                        <span key={serviceValue} className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                          {service?.label || serviceValue}
-                          <button onClick={() => handleFilterChange('services', filters.services.filter(s => s !== serviceValue))} className="ml-1 hover:text-gray-900">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      );
-                    })}
                   </div>
                 </div>
               )}

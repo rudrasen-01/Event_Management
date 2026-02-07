@@ -9,6 +9,9 @@ This folder contains scripts and utilities for development, testing, and mainten
 # Check database contents
 node dev-tools/check-db.js
 
+# Populate complete Indian event marketplace taxonomy
+node dev-tools/populate-taxonomy.js
+
 # Remove test/seed data
 node dev-tools/remove-seed-data.js
 

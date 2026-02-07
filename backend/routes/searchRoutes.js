@@ -4,13 +4,19 @@ const {
   searchVendors,
   getVendorById,
   getFeaturedVendors,
-  getVendorsByService
+  getVendorsByService,
+  getSearchSuggestions
 } = require('../controllers/searchController');
 
 // @route   POST /api/search
-// @desc    Advanced vendor search with filters
+// @desc    Advanced vendor search with filters (includes normalization)
 // @access  Public
 router.post('/', searchVendors);
+
+// @route   GET /api/search/suggestions?q=query
+// @desc    Get intelligent search suggestions from taxonomy
+// @access  Public
+router.get('/suggestions', getSearchSuggestions);
 
 // @route   GET /api/search/featured
 // @desc    Get featured vendors

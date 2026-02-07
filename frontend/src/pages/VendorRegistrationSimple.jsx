@@ -96,8 +96,6 @@ const VendorRegistrationSimple = () => {
         description: formData.description.trim() || undefined
       };
 
-      console.log('Submitting vendor registration:', payload);
-
       const response = await fetch('http://localhost:5000/api/vendors/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,7 +108,6 @@ const VendorRegistrationSimple = () => {
         throw new Error(data.error?.message || data.message || 'Registration failed');
       }
 
-      console.log('Registration successful:', data);
       setSuccess(true);
       
       setTimeout(() => {

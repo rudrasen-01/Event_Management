@@ -2,9 +2,12 @@
  * DYNAMIC DATA API SERVICE
  * Fetches all filter options, service types, cities from live database
  * NO STATIC DATA - Everything is database-driven
+ * 
+ * Service types now come from master taxonomy system
  */
 
 import axios from 'axios';
+import { getAllServices, searchTaxonomy } from './taxonomyService';
 
 // Base API URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -19,13 +22,19 @@ const apiClient = axios.create({
 });
 
 /**
- * Fetch all service types from actual vendors in database
- * Replaces hardcoded serviceTypes arrays
+ * Fetch all service types from master taxonomy
+ * Now uses taxonomy API instead of vendor-derived data
  */
 export const fetchServiceTypes = async () => {
   try {
-    const response = await apiClient.get('/dynamic/service-types');
-    return response.data?.data || [];
+    const services = await getAllServices();
+    // Format for backward compatibility with existing components
+    return services.map(service => ({
+      value: service.taxonomyId,
+      label: service.name,
+      icon: service.icon || '🔧',
+      keywords: service.keywords || []
+    }));
   } catch (error) {
     console.error('Error fetching service types:', error);
     return [];
@@ -75,16 +84,18 @@ export const fetchPriceRanges = async (serviceType = null, city = null) => {
 };
 
 /**
- * Fetch intelligent search suggestions from database
- * Includes vendors, service types, and cities
+ * Fetch intelligent search suggestions from taxonomy and normalization
+ * Uses backend normalization service for fuzzy matching
  */
 export const fetchSearchSuggestions = async (query, limit = 10) => {
   try {
     if (!query || query.length < 2) return [];
     
-    const response = await apiClient.get('/dynamic/search-suggestions', {
+    // Use backend search suggestions endpoint (includes normalization)
+    const response = await apiClient.get('/search/suggestions', {
       params: { q: query, limit }
     });
+    
     return response.data || [];
   } catch (error) {
     console.error('Error fetching search suggestions:', error);

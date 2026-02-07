@@ -1,5 +1,13 @@
 const Vendor = require('../models/VendorNew');
 const Service = require('../models/Service');
+const { 
+  normalizeSearchQuery, 
+  buildVendorQuery, 
+  getSearchSuggestions 
+} = require('../services/searchNormalizationService');
+const { 
+  generateFiltersFromResults 
+} = require('../services/filterService');
 
 exports.searchVendors = async (req, res, next) => {
   try {
@@ -16,13 +24,39 @@ exports.searchVendors = async (req, res, next) => {
       limit = 20
     } = req.body;
     
-    console.log('🔍 Search:', { serviceId, query, city: location?.city, budget });
+    // STEP 1: Normalize search query using taxonomy
+    let normalizedSearch = null;
+    let effectiveServiceId = serviceId;
+    
+    // IMPORTANT: Only use taxonomy normalization if NO text query exists
+    // or if explicit serviceId is provided
+    // When user types free text, let the regex search handle it across all fields
+    if (query && query.trim() && !serviceId) {
+      // Normalize user input to taxonomy services - but DON'T USE IT FOR FILTERING
+      // Just use it for context and suggestions
+      normalizedSearch = await normalizeSearchQuery(query);
+      
+      // DO NOT set effectiveServiceId from normalized query
+      // Let the text search (regex) in the model handle matching across all fields
+      // This ensures "photography" matches "corporate-event-photography"
+      console.log('📝 Normalized search context:', {
+        originalQuery: query,
+        bestMatch: normalizedSearch.bestMatch?.label,
+        confidence: normalizedSearch.confidence,
+        matchType: normalizedSearch.matchType
+      });
+      console.log('   ⚠️  NOT using normalized serviceId - letting regex search handle it');
+    } else if (serviceId) {
+      // Explicit serviceId provided (from filter dropdown, not autocomplete)
+      effectiveServiceId = serviceId;
+      console.log('   ✅ Using explicit serviceId:', effectiveServiceId);
+    }
     
     // Optional service validation (don't block search if service not in collection)
     let service = null;
-    if (serviceId) {
+    if (effectiveServiceId && typeof effectiveServiceId === 'string') {
       service = await Service.findOne({ 
-        serviceId: serviceId.toLowerCase(),
+        serviceId: effectiveServiceId.toLowerCase(),
         isActive: true 
       });
       
@@ -30,16 +64,15 @@ exports.searchVendors = async (req, res, next) => {
       if (service && filters && Object.keys(filters).length > 0) {
         const validation = service.validateFilters(filters);
         if (!validation.isValid) {
-          console.warn('⚠️  Filter validation warning:', validation.errors);
-          // Don't block search, just log warning
+          // Don't block search on filter validation failure
         }
       }
     }
     
-    // Prepare comprehensive search parameters
+    // STEP 2: Prepare comprehensive search parameters
     const searchParams = {
-      query: query?.trim() || '',              // Text search
-      serviceType: serviceId || undefined,     // Category filter
+      query: query?.trim() || '',              // Text search on business names
+      serviceType: effectiveServiceId || undefined,     // Category filter (can be array)
       location: location ? {
         city: location.city,
         area: location.area,
@@ -57,7 +90,6 @@ exports.searchVendors = async (req, res, next) => {
     };
     
     const result = await Vendor.comprehensiveSearch(searchParams);
-    console.log(`✅ Found ${result.total} vendors`);
     
     // Calculate distance for each vendor (if geospatial search used)
     let resultsWithDistance = result.results || [];
@@ -83,7 +115,15 @@ exports.searchVendors = async (req, res, next) => {
       });
     }
     
-    // Response format
+    // STEP 3: Generate context-aware filters from current results
+    const availableFilters = await generateFiltersFromResults(resultsWithDistance, {
+      query: query || '',
+      serviceType: effectiveServiceId,
+      city: location?.city,
+      searchContext: normalizedSearch
+    });
+    
+    // Response format with normalization context
     res.json({
       success: true,
       data: {
@@ -101,13 +141,55 @@ exports.searchVendors = async (req, res, next) => {
           budget: budget || null,
           verified: verified !== undefined ? verified : null,
           rating: rating || null
-        }
+        },
+        // Normalization context - helps frontend understand what was matched
+        normalization: normalizedSearch ? {
+          originalQuery: normalizedSearch.originalQuery,
+          normalizedQuery: normalizedSearch.normalizedQuery,
+          matchType: normalizedSearch.matchType,
+          confidence: normalizedSearch.confidence,
+          bestMatch: normalizedSearch.bestMatch,
+          suggestedServices: normalizedSearch.taxonomyMatches.services.slice(0, 3).map(s => ({
+            taxonomyId: s.taxonomyId,
+            name: s.name,
+            icon: s.icon
+          }))
+        } : null,
+        // Available filters - marketplace-grade, context-aware filters based on current results
+        availableFilters
       }
     });
     
     
   } catch (error) {
     console.error('Search error:', error);
+    next(error);
+  }
+};
+
+// Get intelligent search suggestions based on taxonomy
+exports.getSearchSuggestions = async (req, res, next) => {
+  try {
+    const { q, limit = 12 } = req.query;
+    
+    // Return empty array for very short queries
+    if (!q || q.trim().length < 1) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
+    const suggestions = await getSearchSuggestions(q.trim(), parseInt(limit));
+    
+    res.json({
+      success: true,
+      query: q,
+      count: suggestions.length,
+      data: suggestions
+    });
+  } catch (error) {
+    console.error('Search suggestions error:', error);
     next(error);
   }
 };

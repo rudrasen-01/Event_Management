@@ -108,8 +108,6 @@ const AdminPanel = () => {
         fetchAdminStats(),
         fetchRecentActivity(10)
       ]);
-      console.log('Stats data:', statsData);
-      console.log('Activity data:', activityData);
       setStats(statsData?.data || statsData);
       setRecentActivity(activityData?.data || activityData);
     } catch (error) {
@@ -124,12 +122,9 @@ const AdminPanel = () => {
     setLoading(true);
     try {
       const response = await fetchAllVendorsAdmin({ page: 1, limit: 100 });
-      console.log('✅ Vendors API Response:', response);
       
       // Response structure: { success: true, data: { vendors: [], total, page, totalPages } }
       const vendorsList = response?.data?.vendors || [];
-      console.log('📦 Vendors List:', vendorsList);
-      console.log('🔢 Vendors Count:', vendorsList.length);
       
       setVendors(vendorsList);
       
@@ -150,7 +145,6 @@ const AdminPanel = () => {
     setLoading(true);
     try {
       const data = await fetchAllUsers({ page: 1, limit: 100 });
-      console.log('Users data:', data);
       setUsers(data?.users || []);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -164,10 +158,8 @@ const AdminPanel = () => {
     setLoading(true);
     try {
       const data = await fetchAllInquiriesAdmin({ page: 1, limit: 200 });
-      console.log('Inquiries data:', data);
       // Backend returns: { inquiries: [...], total, page, totalPages }
       const inquiriesList = data?.inquiries || [];
-      console.log('Inquiries list:', inquiriesList);
       setInquiries(inquiriesList);
     } catch (error) {
       console.error('Error loading inquiries:', error);

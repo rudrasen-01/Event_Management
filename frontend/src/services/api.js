@@ -442,7 +442,6 @@ export const fetchAllVendorsAdmin = async (params = {}) => {
     const response = await apiClient.get(`/admin/vendors?${queryString}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    console.log('API Response:', response);
     return response;
   } catch (error) {
     console.error('Error fetching vendors:', error);
