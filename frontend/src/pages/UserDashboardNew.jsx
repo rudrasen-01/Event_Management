@@ -64,15 +64,16 @@ const UserDashboard = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const userContact = user?.phone || user?.email;
       
-      if (!userContact) {
-        showNotification('error', 'User contact information not available');
+      if (!token) {
+        showNotification('error', 'Please login to view your inquiries');
         return;
       }
 
+      // Backend automatically filters inquiries based on logged-in user
+      // No need to pass userContact - backend uses req.user.email and req.user.phone
       const response = await fetch(
-        `http://localhost:5000/api/inquiries?userContact=${userContact}`,
+        `http://localhost:5000/api/inquiries`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }

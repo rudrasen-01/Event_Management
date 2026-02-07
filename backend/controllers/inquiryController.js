@@ -215,8 +215,9 @@ exports.createInquiry = async (req, res, next) => {
 };
 
 /**
- * Get all inquiries (Admin/Dashboard)
+ * Get all inquiries (Admin/Dashboard/User)
  * Fetches from both VendorInquiry and ContactInquiry collections
+ * SECURITY: Filters by user role - users see only their own inquiries
  */
 exports.getAllInquiries = async (req, res, next) => {
   try {
@@ -231,6 +232,41 @@ exports.getAllInquiries = async (req, res, next) => {
 
     const query = {};
     if (status) query.status = status;
+
+    // CRITICAL SECURITY FIX: Filter inquiries based on user role
+    const loggedInUser = req.user;
+    
+    if (!loggedInUser) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required' }
+      });
+    }
+
+    // Apply role-based filtering
+    if (loggedInUser.role === 'user') {
+      // Regular users: Only see their own inquiries (filter by email OR phone)
+      // Using $or to match either email or phone from the logged-in user
+      query.$or = [
+        { userEmail: loggedInUser.email },
+        { userContact: loggedInUser.phone }
+      ];
+      console.log(`🔒 User ${loggedInUser.email} accessing their own inquiries only`);
+    } else if (loggedInUser.role === 'vendor') {
+      // Vendors: Only see inquiries sent to them (filter by vendorId)
+      query.vendorId = loggedInUser._id;
+      query.approvalStatus = 'approved'; // Vendors only see approved inquiries
+      console.log(`🔒 Vendor ${loggedInUser._id} accessing their approved inquiries only`);
+    } else if (loggedInUser.role === 'admin') {
+      // Admins: Can see all inquiries (no filter)
+      console.log(`👑 Admin ${loggedInUser.email} accessing all inquiries`);
+    } else {
+      // Unknown role - deny access
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Access denied' }
+      });
+    }
 
     const skip = (page - 1) * limit;
     const sortOrder = order === 'desc' ? -1 : 1;
@@ -303,11 +339,21 @@ exports.getAllInquiries = async (req, res, next) => {
  * Get inquiries for a specific vendor
  * Uses VendorInquiry collection only
  * NOTE: Vendors can only see APPROVED inquiries
+ * SECURITY: Vendors can only access their own inquiries
  */
 exports.getVendorInquiries = async (req, res, next) => {
   try {
     const { vendorId } = req.params;
     const { status, page = 1, limit = 20 } = req.query;
+    const loggedInUser = req.user;
+
+    // SECURITY CHECK: Vendors can only view their own inquiries
+    if (loggedInUser.role === 'vendor' && vendorId !== loggedInUser._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'You can only view your own inquiries' }
+      });
+    }
 
     // IMPORTANT: Vendors can only see approved inquiries
     const query = { 
@@ -350,13 +396,26 @@ exports.getVendorInquiries = async (req, res, next) => {
 
 /**
  * Get single inquiry by ID
+ * SECURITY: Users can only view their own inquiries, vendors only their inquiries, admins see all
  */
 exports.getInquiryById = async (req, res, next) => {
   try {
     const { inquiryId } = req.params;
+    const loggedInUser = req.user;
 
-    const inquiry = await Inquiry.findById(inquiryId)
+    // Try both collections
+    let inquiry = await VendorInquiry.findById(inquiryId)
       .populate('vendorId', 'name businessName serviceType contact city');
+    
+    if (!inquiry) {
+      inquiry = await ContactInquiry.findById(inquiryId);
+    }
+    
+    // Legacy fallback
+    if (!inquiry) {
+      inquiry = await Inquiry.findById(inquiryId)
+        .populate('vendorId', 'name businessName serviceType contact city');
+    }
 
     if (!inquiry) {
       return res.status(404).json({
@@ -367,6 +426,26 @@ exports.getInquiryById = async (req, res, next) => {
         }
       });
     }
+
+    // SECURITY CHECK: Verify user has permission to view this inquiry
+    if (loggedInUser.role === 'user') {
+      // Users can only view their own inquiries
+      if (inquiry.userEmail !== loggedInUser.email) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'You can only view your own inquiries' }
+        });
+      }
+    } else if (loggedInUser.role === 'vendor') {
+      // Vendors can only view inquiries sent to them
+      if (!inquiry.vendorId || inquiry.vendorId.toString() !== loggedInUser._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'You can only view inquiries sent to you' }
+        });
+      }
+    }
+    // Admins can view all inquiries (no check needed)
 
     res.json({
       success: true,
