@@ -42,13 +42,13 @@ exports.loginVendor = async (req, res, next) => {
       });
     }
     
-    // Check if vendor is active
+    // Check if vendor is active (admin must activate after registration)
     if (!vendor.isActive) {
       return res.status(403).json({
         success: false,
         error: {
-          code: 'ACCOUNT_INACTIVE',
-          message: 'Your account has been deactivated. Please contact support.'
+          code: 'ACCOUNT_PENDING_APPROVAL',
+          message: 'Your account is pending admin approval. You will be able to login once activated by admin.'
         }
       });
     }

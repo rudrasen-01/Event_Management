@@ -486,15 +486,19 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   
   console.log('🔍 VendorModel.comprehensiveSearch - Building query...');
   
-  // Base query: Only active AND verified vendors appear in public search
-  // Admin can override by explicitly passing verified: false
+  // Base query: Only active vendors appear in public search
+  // Verified is just a badge/trust indicator, not a search filter
   let query = { 
-    isActive: true,
-    verified: verified !== undefined ? verified : true  // Default to verified vendors only
+    isActive: true
   };
   let useTextScore = false;
   
-  console.log('🔍 Search:', { searchQuery, serviceType, city: location?.city, verified: query.verified, rating });
+  // Optional: Admin can explicitly filter by verified status
+  if (verified !== undefined) {
+    query.verified = verified;
+  }
+  
+  console.log('🔍 Search:', { searchQuery, serviceType, city: location?.city, verified: verified !== undefined ? verified : 'any', rating });
   
   // COMPREHENSIVE TEXT SEARCH - Use regex for flexible partial matching
   // This approach works better for real-time search as users type
