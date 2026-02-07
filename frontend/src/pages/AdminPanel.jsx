@@ -372,7 +372,7 @@ const AdminPanel = () => {
       requireInput: false,
       onConfirm: async () => {
         try {
-          await toggleVendorVerification(vendor._id);
+          await toggleVendorVerification(vendor._id, willVerify);
           showNotification('success', `✅ Vendor ${willVerify ? 'verified' : 'unverified'} successfully`);
           loadVendors();
         } catch (error) {
@@ -392,7 +392,7 @@ const AdminPanel = () => {
       requireInput: false,
       onConfirm: async () => {
         try {
-          await toggleVendorStatus(vendor._id);
+          await toggleVendorStatus(vendor._id, willActivate);
           showNotification('success', `✅ Vendor ${willActivate ? 'activated' : 'deactivated'} successfully`);
           loadVendors();
         } catch (error) {

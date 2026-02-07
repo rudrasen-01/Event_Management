@@ -210,16 +210,18 @@ exports.registerVendor = async (req, res, next) => {
       portfolio: portfolio || [],
       serviceAreas: serviceAreas || [],
       verified: false,
-      isActive: true
+      isActive: false  // Vendors start inactive, admin must activate after review
     });
     
     res.status(201).json({
       success: true,
-      message: 'Vendor registration successful! Your profile is now live.',
+      message: 'Vendor registration successful! Your profile is pending admin approval and will go live once verified.',
       data: {
         vendorId: vendor.vendorId,
         name: vendor.name,
         serviceType: vendor.serviceType,
+        verified: vendor.verified,
+        isActive: vendor.isActive,
         status: 'pending_approval'
       }
     });
