@@ -11,19 +11,33 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Mail, Phone, Calendar, DollarSign, MapPin, Clock,
   CheckCircle, AlertCircle, RefreshCw, Eye, MessageCircle,
   TrendingUp, BarChart3, Filter, Search, X, Send,
   Building2, User, FileText, Award, Bell
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
 import StatusBadge from '../components/StatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 const VendorDashboard = () => {
-  const { user } = useAuth();
-  const vendorId = user?.vendorId || user?._id;
+  const navigate = useNavigate();
+  
+  // Get vendor info from localStorage
+  const vendorToken = localStorage.getItem('authToken') || localStorage.getItem('vendorToken');
+  const vendorId = localStorage.getItem('vendorId');
+  const vendorBusinessName = localStorage.getItem('vendorBusinessName');
+  const vendorEmail = localStorage.getItem('vendorEmail');
+  
+  // Check authentication
+  useEffect(() => {
+    if (!vendorToken || !vendorId) {
+      navigate('/');
+    }
+  }, [vendorToken, vendorId, navigate]);
 
   // State Management
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -78,20 +92,43 @@ const VendorDashboard = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
+      if (!vendorToken) {
+        showNotification('error', 'Authentication required');
+        navigate('/');
+        return;
+      }
+      
+      console.log('📊 Loading dashboard data...');
+      console.log('API URL:', `${API_BASE_URL}/vendors/dashboard/inquiries`);
+      console.log('Token:', vendorToken ? 'Present' : 'Missing');
+      
       const [inquiriesRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/vendors/dashboard/inquiries?limit=100`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`${API_BASE_URL}/vendors/dashboard/inquiries?limit=100`, {
+          headers: { 
+            'Authorization': `Bearer ${vendorToken}`,
+            'Content-Type': 'application/json'
+          }
         })
       ]);
 
+      console.log('Response status:', inquiriesRes.status);
+      
+      if (!inquiriesRes.ok) {
+        const errorText = await inquiriesRes.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`API error: ${inquiriesRes.status}`);
+      }
+      
       const inquiriesData = await inquiriesRes.json();
+      console.log('Dashboard data received:', inquiriesData);
       
       if (inquiriesData.success) {
         // Handle different response formats
         const allInquiries = Array.isArray(inquiriesData.data)
           ? inquiriesData.data
           : (inquiriesData.data?.inquiries || []);
+        
+        console.log('Total inquiries found:', allInquiries.length);
         
         setStats({
           total: allInquiries.length,
@@ -100,11 +137,17 @@ const VendorDashboard = () => {
           closed: allInquiries.filter(i => i.status === 'closed' || i.status === 'completed').length
         });
       } else {
+        console.warn('API returned success=false:', inquiriesData.message);
+        showNotification('error', inquiriesData.message || 'Failed to load data');
         setStats({ total: 0, new: 0, responded: 0, closed: 0 });
       }
     } catch (error) {
       console.error('Error loading dashboard:', error);
-      showNotification('error', 'Failed to load dashboard data');
+      if (error.message.includes('Failed to fetch')) {
+        showNotification('error', 'Cannot connect to server. Please check if backend is running on port 5000');
+      } else {
+        showNotification('error', 'Failed to load dashboard data: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -114,11 +157,33 @@ const VendorDashboard = () => {
   const loadInquiries = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5000/api/vendors/dashboard/inquiries?limit=100`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      if (!vendorToken) {
+        showNotification('error', 'Authentication required');
+        navigate('/');
+        return;
+      }
+      
+      console.log('📧 Loading inquiries...');
+      console.log('API URL:', `${API_BASE_URL}/vendors/dashboard/inquiries`);
+      console.log('Vendor ID:', vendorId);
+      
+      const response = await fetch(`${API_BASE_URL}/vendors/dashboard/inquiries?limit=100`, {
+        headers: { 
+          'Authorization': `Bearer ${vendorToken}`,
+          'Content-Type': 'application/json'
+        }
       });
+      
+      console.log('Inquiries response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Inquiries API Error:', errorText);
+        throw new Error(`API error: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log('Inquiries data received:', data);
       
       if (data.success) {
         // Handle different response formats
@@ -126,16 +191,29 @@ const VendorDashboard = () => {
           ? data.data
           : (data.data?.inquiries || []);
         
+        console.log('Total inquiries from API:', allInquiries.length);
+        
         // Only show approved inquiries
         const approvedInquiries = allInquiries.filter(i => i.approvalStatus === 'approved');
+        console.log('Approved inquiries:', approvedInquiries.length);
+        
         setInquiries(approvedInquiries);
+        
+        if (approvedInquiries.length === 0 && allInquiries.length > 0) {
+          showNotification('info', `Found ${allInquiries.length} inquiries but none are approved yet`);
+        }
       } else {
+        console.warn('API returned success=false:', data.message);
         setInquiries([]);
         showNotification('error', data.message || 'Failed to load inquiries');
       }
     } catch (error) {
       console.error('Error fetching inquiries:', error);
-      showNotification('error', 'Failed to load inquiries');
+      if (error.message.includes('Failed to fetch')) {
+        showNotification('error', 'Cannot connect to server. Please check if backend is running');
+      } else {
+        showNotification('error', 'Failed to load inquiries: ' + error.message);
+      }
       setInquiries([]);
     } finally {
       setLoading(false);
@@ -155,15 +233,20 @@ const VendorDashboard = () => {
       return;
     }
 
+    if (!vendorToken) {
+      showNotification('error', 'Authentication required');
+      navigate('/');
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `http://localhost:5000/api/inquiries/${selectedInquiry._id}/respond`,
+        `${API_BASE_URL}/inquiries/${selectedInquiry._id}/status`,
         {
-          method: 'POST',
+          method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${vendorToken}`
           },
           body: JSON.stringify({
             vendorResponse: responseText,
@@ -259,7 +342,7 @@ const VendorDashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-4xl font-bold mb-2">Welcome Back! 👋</h2>
-            <p className="text-xl text-white text-opacity-90">{user?.businessName || user?.name}</p>
+            <p className="text-xl text-white text-opacity-90">{vendorBusinessName}</p>
             <p className="text-blue-100 mt-1">Manage your inquiries and grow your business</p>
           </div>
           <div className="hidden md:block">
@@ -477,7 +560,7 @@ const VendorDashboard = () => {
                 )}
 
                 <div className="flex flex-wrap gap-3">
-                  {(inquiry.status === 'pending' || inquiry.status === 'sent') && (
+                  {(inquiry.status === 'pending' || inquiry.status === 'sent') && !inquiry.vendorResponse && (
                     <button
                       onClick={() => handleRespondToInquiry(inquiry)}
                       className="px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -486,13 +569,12 @@ const VendorDashboard = () => {
                       Respond
                     </button>
                   )}
-                  <button
-                    onClick={() => setSelectedInquiry(inquiry)}
-                    className="px-5 py-3 bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-800 rounded-xl font-bold transition-all flex items-center gap-2 shadow-md hover:shadow-lg transform hover:scale-105"
-                  >
-                    <Eye className="w-5 h-5" />
-                    View Details
-                  </button>
+                  {inquiry.vendorResponse && (
+                    <div className="px-5 py-3 bg-green-100 text-green-700 rounded-xl font-bold flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5" />
+                      Response Sent
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -501,8 +583,14 @@ const VendorDashboard = () => {
           <div className="text-center py-20">
             <div className="inline-block p-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl">
               <Mail className="w-16 h-16 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600 font-bold text-lg">No inquiries found</p>
-              <p className="text-sm text-gray-500 mt-1">New approved inquiries will appear here</p>
+              <p className="text-gray-600 font-bold text-lg">
+                {filterStatus !== 'all' || searchTerm ? 'No matching inquiries found' : 'No inquiries yet'}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {filterStatus !== 'all' || searchTerm 
+                  ? 'Try adjusting your filters' 
+                  : 'New approved inquiries will appear here'}
+              </p>
             </div>
           </div>
         )}
@@ -527,7 +615,7 @@ const VendorDashboard = () => {
       />
 
       {/* Response Modal */}
-      {selectedInquiry && responseText !== undefined && (
+      {selectedInquiry && responseText !== '' && (selectedInquiry.status === 'pending' || selectedInquiry.status === 'sent') && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">

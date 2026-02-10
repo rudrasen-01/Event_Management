@@ -6,9 +6,8 @@ import {
 } from 'lucide-react';
 import VendorCard from '../components/VendorCard';
 import { fetchVendors } from '../services/api';
-import { fetchServiceTypes, fetchCities } from '../services/dynamicDataService';
+import { fetchServiceTypes, fetchCities, fetchAreas } from '../services/dynamicDataService';
 import { formatCurrency } from '../utils/format';
-import { AREAS_BY_CITY } from '../utils/constants';
 import { getSuggestedServices } from '../services/filterService';
 import { useSearch } from '../contexts/SearchContext';
 import SearchAutocomplete from '../components/SearchAutocomplete';
@@ -58,6 +57,7 @@ const SearchEventsPage = () => {
   // Dynamic data from database
   const [serviceTypes, setServiceTypes] = useState([]);
   const [cities, setCities] = useState([]);
+  const [availableAreas, setAvailableAreas] = useState([]);
   const [loadingFilters, setLoadingFilters] = useState(true);
   
   // Location dropdown states
@@ -84,6 +84,26 @@ const SearchEventsPage = () => {
     
     loadFilterData();
   }, []);
+
+  // Load areas when selected city changes
+  useEffect(() => {
+    const loadAreas = async () => {
+      if (selectedCity) {
+        try {
+          const areasData = await fetchAreas(selectedCity);
+          // Format to match expected structure
+          setAvailableAreas(areasData.map(a => a.name));
+        } catch (error) {
+          console.error('Error loading areas:', error);
+          setAvailableAreas([]);
+        }
+      } else {
+        setAvailableAreas([]);
+      }
+    };
+    
+    loadAreas();
+  }, [selectedCity]);
 
   // Debounce timer ref for search query
   const searchDebounceTimer = useRef(null);
@@ -187,7 +207,6 @@ const SearchEventsPage = () => {
         setSuggestions(serviceSuggestions);
         setLiveVendorSuggestions(dbSuggestions.filter(s => s.type === 'vendor'));
       } catch (error) {
-        console.log('Suggestion fetch error (non-critical):', error);
         // Fallback to local suggestions
         const localSuggestions = getSuggestedServices(searchQuery.trim());
         setSuggestions(localSuggestions);
@@ -308,8 +327,6 @@ const SearchEventsPage = () => {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
-
-  const availableAreas = selectedCity ? (AREAS_BY_CITY[selectedCity] || []) : [];
 
   // Normalize service type for better matching
   const normalizeServiceType = (serviceType) => {

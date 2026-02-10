@@ -79,10 +79,6 @@ const DynamicSearchPageContent = () => {
       // Use only database-driven results - no mock data fallback
       const vendorsList = response.vendors || [];
       setResults(vendorsList);
-      
-      if (vendorsList.length === 0) {
-        console.log('ℹ️ No vendors found in database for current search criteria');
-      }
     } catch (error) {
       console.error('❌ Search error:', error);
       // Show empty state on error - no mock data

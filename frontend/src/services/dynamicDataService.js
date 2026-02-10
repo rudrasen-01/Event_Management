@@ -56,6 +56,21 @@ export const fetchCities = async () => {
 };
 
 /**
+ * Fetch all areas for a specific city from actual vendors in database
+ * Replaces hardcoded AREAS_BY_CITY object
+ */
+export const fetchAreas = async (city) => {
+  try {
+    if (!city) return [];
+    const response = await apiClient.get('/dynamic/areas', { params: { city } });
+    return response.data?.data || [];
+  } catch (error) {
+    console.error('Error fetching areas:', error);
+    return [];
+  }
+};
+
+/**
  * Fetch dynamic price ranges based on actual vendor pricing
  * Optionally filtered by service type and city
  */
@@ -124,6 +139,7 @@ export const fetchFilterStats = async (city = null, serviceType = null) => {
 export default {
   fetchServiceTypes,
   fetchCities,
+  fetchAreas,
   fetchPriceRanges,
   fetchSearchSuggestions,
   fetchFilterStats

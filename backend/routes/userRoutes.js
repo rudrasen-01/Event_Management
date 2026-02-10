@@ -7,6 +7,7 @@ const {
   updateProfile,
   logoutUser
 } = require('../controllers/userController');
+const { googleLoginUser } = require('../controllers/googleAuthController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 // @route   POST /api/users/register
@@ -18,6 +19,11 @@ router.post('/register', registerUser);
 // @desc    Login user/admin
 // @access  Public
 router.post('/login', loginUser);
+
+// @route   POST /api/users/google-login
+// @desc    Google Sign-In for users/admin
+// @access  Public
+router.post('/google-login', googleLoginUser);
 
 // @route   GET /api/users/profile
 // @desc    Get current user profile

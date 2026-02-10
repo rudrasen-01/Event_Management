@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapPin, DollarSign, Phone, Star, Clock, Award, ChevronRight, Briefcase, TrendingUp, CheckCircle } from 'lucide-react';
 import InquiryModal from './InquiryModal';
+import { useSearch } from '../contexts/SearchContext';
 
 /**
  * VendorCard Component - Professional JustDial/UrbanCompany Style
@@ -19,6 +20,9 @@ const VendorCard = ({
   prefilledEventType = ''
 }) => {
   const [showInquiryModal, setShowInquiryModal] = useState(false);
+  
+  // Access search filters from context
+  const { filters } = useSearch();
 
   const handleInquiryClick = () => {
     if (onInquiry) {
@@ -239,6 +243,7 @@ const VendorCard = ({
         vendor={vendor}
         userLocation={userLocation}
         prefilledEventType={prefilledEventType}
+        searchFilters={filters}
       />
     </div>
   );

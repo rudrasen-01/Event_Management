@@ -37,21 +37,31 @@ const protect = async (req, res, next) => {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
       
+      console.log('🔐 Token decoded:', { id: decoded.id, role: decoded.role, email: decoded.email });
+      
       let user;
       
       // Check if it's a vendor token
       if (decoded.role === 'vendor') {
         user = await Vendor.findById(decoded.id).select('-password');
         if (user) {
-          user.role = 'vendor';
-          user.vendorId = user.vendorId || user._id;
+          // Convert to plain object and set role
+          const userObj = user.toObject();
+          userObj.role = 'vendor';
+          userObj.vendorId = user.vendorId;
+          user = userObj;
+          console.log('✅ Vendor authenticated:', { _id: user._id, role: user.role, vendorId: user.vendorId });
         }
       } else {
         // Try to find as regular user
         user = await User.findById(decoded.id).select('-password');
+        if (user) {
+          console.log('✅ User authenticated:', { _id: user._id, role: user.role });
+        }
       }
       
       if (!user) {
+        console.error('❌ User/Vendor not found in database for ID:', decoded.id);
         return res.status(401).json({
           success: false,
           error: {
@@ -62,7 +72,8 @@ const protect = async (req, res, next) => {
       }
       
       // Check if user/vendor is active
-      if (!user.isActive) {
+      if (user.isActive === false) {
+        console.error('❌ Account is inactive for:', user._id);
         return res.status(403).json({
           success: false,
           error: {
@@ -71,6 +82,8 @@ const protect = async (req, res, next) => {
           }
         });
       }
+      
+      console.log('✅ Auth successful - User attached to request:', { _id: user._id, role: user.role });
       
       // Attach user to request
       req.user = user;
@@ -138,7 +151,6 @@ const authorize = (...roles) => {
 const verifyVendorOwnership = async (req, res, next) => {
   try {
     // TODO: Implement vendor ownership verification
-    // const vendor = await Vendor.findById(req.params.id);
     // if (vendor.userId.toString() !== req.user.id) {
     //   throw new Error('Not authorized');
     // }

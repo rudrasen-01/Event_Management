@@ -5,8 +5,8 @@ import {
   ChevronRight, ChevronLeft, Home, Building2, User, IndianRupee,
   Calendar, Shield, Check, AlertCircle
 } from 'lucide-react';
-import { CITIES } from '../utils/constants';
 import { getAllServices } from '../services/taxonomyService';
+import { fetchCities } from '../services/dynamicDataService';
 import VendorLoginModal from '../components/VendorLoginModal';
 
 const VendorRegistrationMultiStep = () => {
@@ -20,9 +20,11 @@ const VendorRegistrationMultiStep = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   
-  // Single Source of Truth - Services fetched from backend
+  // Single Source of Truth - Data fetched from backend
   const [vendorServices, setVendorServices] = useState([]);
+  const [cities, setCities] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
+  const [citiesLoading, setCitiesLoading] = useState(true);
 
   const totalSteps = 6;
 
@@ -62,12 +64,14 @@ const VendorRegistrationMultiStep = () => {
     setSuccess(false);
     setCategorySearch('');
     
-    // Fetch services from master taxonomy - Single Source of Truth
-    const loadServices = async () => {
+    // Fetch services and cities from backend - Single Source of Truth
+    const loadData = async () => {
       setServicesLoading(true);
+      setCitiesLoading(true);
+      
       try {
+        // Fetch services from master taxonomy
         const services = await getAllServices();
-        // Format for vendor registration: { value: taxonomyId, label: name, icon, category: parentId }
         const formattedServices = services.map(service => ({
           value: service.taxonomyId,
           label: service.name,
@@ -75,15 +79,20 @@ const VendorRegistrationMultiStep = () => {
           category: service.parentId || 'other'
         }));
         setVendorServices(formattedServices);
+        
+        // Fetch cities from dynamic API
+        const citiesData = await fetchCities();
+        setCities(citiesData);
       } catch (err) {
-        console.error('Failed to load services:', err);
-        setError('Failed to load business categories. Please refresh the page.');
+        console.error('Failed to load data:', err);
+        setError('Failed to load registration data. Please refresh the page.');
       } finally {
         setServicesLoading(false);
+        setCitiesLoading(false);
       }
     };
     
-    loadServices();
+    loadData();
     
     return () => {
       setCurrentStep(1);
@@ -215,8 +224,9 @@ const VendorRegistrationMultiStep = () => {
     setError('');
 
     try {
-      const selectedCity = CITIES.find(city => city.name === formData.city);
-      const [lng, lat] = selectedCity?.coordinates || [75.8577, 22.7196];
+      const selectedCity = cities.find(city => city.name === formData.city);
+      // Default coordinates (can be enhanced with geocoding API)
+      const [lng, lat] = [75.8577, 22.7196];
 
       const addressParts = [
         formData.plotNo,
@@ -572,11 +582,12 @@ const VendorRegistrationMultiStep = () => {
                     <select
                       value={formData.city}
                       onChange={(e) => handleChange('city', e.target.value)}
+                      disabled={citiesLoading}
                       className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
                                focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="">Select City</option>
-                      {CITIES.map((city) => (
+                      <option value="">{citiesLoading ? 'Loading cities...' : 'Select City'}</option>
+                      {cities.map((city) => (
                         <option key={city.name} value={city.name}>{city.name}</option>
                       ))}
                     </select>

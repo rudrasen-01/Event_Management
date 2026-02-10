@@ -347,13 +347,27 @@ exports.getVendorInquiries = async (req, res, next) => {
     const { status, page = 1, limit = 20 } = req.query;
     const loggedInUser = req.user;
 
+    console.log('\n📋 getVendorInquiries called:');
+    console.log('   Requested vendorId:', vendorId, '(type:', typeof vendorId, ')');
+    console.log('   Logged in user._id:', loggedInUser._id.toString(), '(type:', typeof loggedInUser._id, ')');
+    console.log('   User role:', loggedInUser.role);
+
     // SECURITY CHECK: Vendors can only view their own inquiries
-    if (loggedInUser.role === 'vendor' && vendorId !== loggedInUser._id.toString()) {
+    // Convert both to strings for proper comparison
+    const vendorIdStr = vendorId.toString();
+    const userIdStr = loggedInUser._id.toString();
+    
+    if (loggedInUser.role === 'vendor' && vendorIdStr !== userIdStr) {
+      console.error('❌ 403 FORBIDDEN: Vendor trying to access another vendor\'s inquiries');
+      console.error('   vendorId param:', vendorIdStr);
+      console.error('   loggedInUser._id:', userIdStr);
       return res.status(403).json({
         success: false,
         error: { code: 'FORBIDDEN', message: 'You can only view your own inquiries' }
       });
     }
+    
+    console.log('✅ Authorization passed - fetching inquiries');
 
     // IMPORTANT: Vendors can only see approved inquiries
     const query = { 

@@ -11,6 +11,7 @@ const {
   approveVendor,
   rejectVendor
 } = require('../controllers/vendorControllerNew');
+const { googleLoginVendor } = require('../controllers/googleAuthController');
 const inquiryController = require('../controllers/inquiryController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -25,6 +26,11 @@ router.post('/register', registerVendor);
 // @desc    Login vendor
 // @access  Public
 router.post('/login', loginVendor);
+
+// @route   POST /api/vendors/google-login
+// @desc    Google Sign-In for vendors
+// @access  Public
+router.post('/google-login', googleLoginVendor);
 
 // @route   GET /api/vendors/:vendorId
 // @desc    Get vendor profile
@@ -56,32 +62,8 @@ router.get('/dashboard/inquiries', protect, async (req, res, next) => {
     console.log('🔍 Authenticated Vendor ID (MongoDB _id):', vendorMongoId);
     console.log('🔍 Vendor custom vendorId:', req.user.vendorId);
 
-    // Pass MongoDB _id to inquiry controller
-    req.params.vendorId = vendorMongoId;
-    return inquiryController.getVendorInquiries(req, res, next);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Deprecated route - keeping for backward compatibility
-// @route   GET /api/vendors/inquiries
-// @desc    Get inquiries for logged-in vendor (approved only)
-// @access  Private (Vendor)
-router.get('/inquiries', protect, async (req, res, next) => {
-  try {
-    // Get vendor MongoDB _id from authenticated user (NOT the custom vendorId string)
-    const vendorMongoId = req.user._id;
-    
-    if (!vendorMongoId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Vendor authentication required'
-      });
-    }
-
-    // Pass MongoDB _id to inquiry controller
-    req.params.vendorId = vendorMongoId;
+    // Pass MongoDB _id as STRING to inquiry controller
+    req.params.vendorId = vendorMongoId.toString();
     return inquiryController.getVendorInquiries(req, res, next);
   } catch (error) {
     next(error);

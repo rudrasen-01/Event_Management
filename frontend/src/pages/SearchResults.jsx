@@ -8,7 +8,7 @@ import Loader, { ContentLoader } from '../components/Loader';
 import Button from '../components/Button';
 import { fetchVendors } from '../services/api';
 import { formatCurrency, formatDistance } from '../utils/format';
-import { EVENT_TYPES, BUDGET_RANGES } from '../utils/constants';
+import { BUDGET_RANGES } from '../utils/constants';
 
 const SearchResults = () => {
   const [searchParams, setSearchParams] = useSearchParams();

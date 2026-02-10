@@ -15,7 +15,6 @@ import SearchResults from './pages/SearchResults';
 import SearchResultsFunnel from './pages/SearchResultsFunnel';
 import DynamicSearchPage from './pages/DynamicSearchPage';
 import SearchEventsPage from './pages/SearchEventsPage';
-import Dashboard from './pages/Dashboard';
 import VendorRegistrationMultiStep from './pages/VendorRegistrationMultiStep';
 import VendorDashboard from './pages/VendorDashboard';
 import AdminPanel from './pages/AdminPanel';
@@ -26,6 +25,7 @@ import FAQ from './pages/FAQ';
 import Contact from './pages/Contact';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import PlansPage from './pages/PlansPage';
 
 function App() {
   return (
@@ -35,7 +35,7 @@ function App() {
           <ScrollToTop />
           <div className="App min-h-screen flex flex-col">
             <Header />
-            <main className="flex-1 page-transition">
+            <main className="flex-1 page-transition pt-4 sm:pt-6 md:pt-8">
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<HomePage />} />
@@ -45,6 +45,7 @@ function App() {
                 <Route path="/search-results" element={<SearchResults />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/how-it-works" element={<HowItWorksPage />} />
+                <Route path="/plans" element={<PlansPage />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/privacy" element={<Privacy />} />

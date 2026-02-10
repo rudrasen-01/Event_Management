@@ -276,3 +276,31 @@ body.modal-open {
     position: sticky;
   }
 }
+
+/* Prevent content from touching screen top */
+main {
+  min-height: calc(100vh - 14rem);
+}
+
+/* Ensure all page sections have proper spacing from header */
+main > div, main > section {
+  position: relative;
+}
+
+/* Responsive container constraints */
+.max-w-7xl {
+  max-width: 80rem;
+}
+
+@media (max-width: 1024px) {
+  .max-w-7xl {
+    max-width: 100%;
+  }
+}
+
+/* Prevent header overflow on small screens */
+@media (max-width: 768px) {
+  nav {
+    overflow-x: hidden;
+  }
+}

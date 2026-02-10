@@ -307,4 +307,55 @@ router.get('/filter-stats', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/dynamic/areas?city=xxx
+ * Returns all unique areas for a specific city from actual vendors
+ * Used for area dropdowns - always reflects current coverage
+ */
+router.get('/areas', async (req, res) => {
+  try {
+    const { city } = req.query;
+    
+    if (!city) {
+      return res.status(400).json({
+        success: false,
+        message: 'city query parameter is required'
+      });
+    }
+    
+    // Get distinct areas from vendors in the specified city
+    const areas = await Vendor.distinct('area', { 
+      city: new RegExp(`^${city}$`, 'i'),
+      isActive: true 
+    });
+    
+    // Filter out empty/null areas and enrich with counts
+    const enriched = await Promise.all(
+      areas.filter(area => area && area.trim()).map(async (area) => {
+        const count = await Vendor.countDocuments({ 
+          city: new RegExp(`^${city}$`, 'i'),
+          area,
+          isActive: true 
+        });
+        
+        return {
+          name: area,
+          count
+        };
+      })
+    );
+    
+    // Sort alphabetically
+    enriched.sort((a, b) => a.name.localeCompare(b.name));
+    
+    res.json({
+      success: true,
+      data: enriched.filter(a => a.count > 0)
+    });
+  } catch (error) {
+    console.error('Error fetching areas:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

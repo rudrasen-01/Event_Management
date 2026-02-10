@@ -113,6 +113,61 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Google Login function
+  const googleLogin = async (idToken, userType = 'user') => {
+    try {
+      // Determine the endpoint based on user type
+      const endpoint = userType === 'vendor' 
+        ? 'http://localhost:5000/api/vendors/google-login'
+        : 'http://localhost:5000/api/users/google-login';
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ token: idToken })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Google login failed');
+      }
+
+      // For vendors, the response structure is slightly different
+      if (userType === 'vendor') {
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('authUser', JSON.stringify(data.data));
+        
+        setToken(data.token);
+        setUser(data.data);
+
+        // Redirect to vendor dashboard
+        navigate('/vendor/dashboard');
+      } else {
+        // For users/admin
+        localStorage.setItem('authToken', data.data.token);
+        localStorage.setItem('authUser', JSON.stringify(data.data.user));
+        
+        setToken(data.data.token);
+        setUser(data.data.user);
+
+        // Redirect based on role
+        if (data.data.user.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
+      }
+
+      return { success: true, user: userType === 'vendor' ? data.data : data.data.user };
+    } catch (error) {
+      console.error('Google login error:', error);
+      throw error;
+    }
+  };
+
   // Logout function
   const logout = () => {
     try {
@@ -158,6 +213,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     register,
+    googleLogin,
     logout,
     updateUser,
     isAdmin,

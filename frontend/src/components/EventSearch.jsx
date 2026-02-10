@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, ArrowRight, Sparkles, Crosshair, Search, ChevronDown, Star, Shield, TrendingUp, Award, Compass, Loader2 } from 'lucide-react';
-import { AREAS_BY_CITY } from '../utils/constants';
 import { useSearch } from '../contexts/SearchContext';
-import { fetchCities, fetchServiceTypes } from '../services/dynamicDataService';
+import { fetchCities, fetchServiceTypes, fetchAreas } from '../services/dynamicDataService';
 import SearchAutocomplete from './SearchAutocomplete';
 
 const EventSearch = () => {
@@ -34,6 +33,7 @@ const EventSearch = () => {
   // Dynamic data state
   const [cities, setCities] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
+  const [availableAreas, setAvailableAreas] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   
   // Local UI state only
@@ -63,6 +63,25 @@ const EventSearch = () => {
     
     loadData();
   }, []);
+
+  // Load areas when selected city changes
+  useEffect(() => {
+    const loadAreas = async () => {
+      if (selectedCity) {
+        try {
+          const areasData = await fetchAreas(selectedCity);
+          setAvailableAreas(areasData.map(a => a.name));
+        } catch (error) {
+          console.error('Error loading areas:', error);
+          setAvailableAreas([]);
+        }
+      } else {
+        setAvailableAreas([]);
+      }
+    };
+    
+    loadAreas();
+  }, [selectedCity]);
 
   // Generate menu from service types - NO hardcoded categorization
   const categoryMegaMenu = React.useMemo(() => {
@@ -226,8 +245,6 @@ const EventSearch = () => {
     });
     setShowAreaDropdown(false);
   };
-
-  const availableAreas = selectedCity ? (AREAS_BY_CITY[selectedCity] || []) : [];
 
   return (
     <section id="event-search" className="relative bg-white">

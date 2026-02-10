@@ -9,7 +9,8 @@
     "seed:admin": "node scripts/seed-admin.js",
     "db:check": "node dev-tools/check-db.js",
     "db:clean": "node dev-tools/remove-seed-data.js",
-    "verify": "node verify-architecture.js"
+    "verify": "node verify-architecture.js",
+    "validate:google": "node scripts/validate-google-oauth.js"
   },
   "keywords": [
     "event",
@@ -20,10 +21,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@react-oauth/google": "^0.13.4",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "google-auth-library": "^10.5.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.0.3"
   },

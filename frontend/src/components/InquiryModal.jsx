@@ -21,7 +21,8 @@ const InquiryModal = ({
   onClose, 
   vendor, 
   userLocation,
-  prefilledEventType = '' 
+  prefilledEventType = null,
+  searchFilters = null // Accept search filters from parent
 }) => {
   const { user, isAuthenticated } = useAuth();
   
@@ -98,12 +99,31 @@ const InquiryModal = ({
   // Reset form when modal opens - auto-fill user data if logged in
   useEffect(() => {
     if (isOpen) {
+      // Pre-populate budget from search filters
+      let preBudget = '';
+      if (searchFilters?.budgetMin && searchFilters?.budgetMax) {
+        // Use average of min and max as pre-filled budget
+        preBudget = Math.round((searchFilters.budgetMin + searchFilters.budgetMax) / 2);
+      } else if (searchFilters?.budgetMin) {
+        preBudget = searchFilters.budgetMin;
+      } else if (searchFilters?.budgetMax) {
+        preBudget = searchFilters.budgetMax;
+      }
+
+      // Pre-populate event type from vendor's serviceType or from search
+      let preEventType = prefilledEventType;
+      if (!preEventType && vendor?.serviceType) {
+        preEventType = vendor.serviceType;
+      } else if (!preEventType && searchFilters?.eventCategory) {
+        preEventType = searchFilters.eventCategory;
+      }
+
       setFormData({
         userName: (isAuthenticated() && user?.name) ? user.name : '',
         userEmail: (isAuthenticated() && user?.email) ? user.email : '',
         userContact: (isAuthenticated() && user?.phone) ? user.phone : '',
-        eventType: prefilledEventType || '',
-        budget: '',
+        eventType: preEventType || '',
+        budget: preBudget,
         message: '' // Explicit empty string prevents undefined
       });
       setErrors({});
@@ -114,7 +134,7 @@ const InquiryModal = ({
         firstInputRef.current?.focus();
       }, 100);
     }
-  }, [isOpen, prefilledEventType, user, isAuthenticated]);
+  }, [isOpen, prefilledEventType, vendor, searchFilters, user, isAuthenticated]);
 
   // ESC key to close modal
   useEffect(() => {
@@ -518,6 +538,11 @@ const InquiryModal = ({
               {errors.eventType && (
                 <p className="mt-1 text-xs text-red-600">{errors.eventType}</p>
               )}
+              {formData.eventType && vendor?.serviceType && (
+                <p className="mt-1 text-xs text-blue-600">
+                  ✓ Pre-filled from vendor profile
+                </p>
+              )}
             </div>
 
             {/* Budget */}
@@ -544,6 +569,11 @@ const InquiryModal = ({
               />
               {errors.budget && (
                 <p className="mt-1 text-xs text-red-600">{errors.budget}</p>
+              )}
+              {searchFilters?.budgetMin && searchFilters?.budgetMax && formData.budget && (
+                <p className="mt-1 text-xs text-blue-600">
+                  ✓ Pre-filled from your search filters (₹{(searchFilters.budgetMin / 1000).toFixed(0)}K - ₹{(searchFilters.budgetMax / 1000).toFixed(0)}K)
+                </p>
               )}
               {vendor?.pricing?.min && vendor?.pricing?.max && (
                 <p className="mt-1 text-xs text-gray-500">
