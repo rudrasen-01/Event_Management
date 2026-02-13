@@ -38,7 +38,7 @@ function App() {
           <ScrollToTop />
           <div className="App min-h-screen flex flex-col">
             <Header />
-            <main className="flex-1 page-transition pt-4 sm:pt-6 md:pt-8">
+            <main className="flex-1 page-transition pt-16 sm:pt-20">
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<HomePage />} />
@@ -50,9 +50,9 @@ function App() {
                 <Route path="/how-it-works" element={<HowItWorksPage />} />
                 <Route path="/plans" element={<PlansPage />} />
                 <Route path="/faq" element={<FAQ />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
+                <Route path="/contact-us" element={<Contact />} />
+                <Route path="/privacy-policy" element={<Privacy />} />
+                <Route path="/terms-and-conditions" element={<Terms />} />
                 
                 {/* Optional User Dashboard - accessible if user wants to see profile/inquiries */}
                 <Route 

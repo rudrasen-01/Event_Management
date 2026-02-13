@@ -9,26 +9,26 @@ const Footer = () => {
     Company: [
       { name: 'About Us', href: '/about' },
       { name: 'How It Works', href: '/how-it-works' },
-      { name: 'Contact', href: '/contact' },
-      { name: 'Blog', href: '#blog' }
+      { name: 'Contact', href: '/contact-us' },
+      { name: 'Plans', href: '/plans' }
     ],
     'For Customers': [
       { name: 'Browse Events', href: '/search' },
-      { name: 'Customer Dashboard', href: '/dashboard' },
+      { name: 'Search Vendors', href: '/search' },
       { name: 'FAQs', href: '/faq' },
-      { name: 'Support', href: '/contact' }
+      { name: 'Support', href: '/contact-us' }
     ],
     'For Vendors': [
       { name: 'Become a Partner', href: '/vendor-registration' },
-      { name: 'Vendor Dashboard', href: '/vendor-dashboard' },
+      { name: 'View Plans', href: '/plans' },
       { name: 'Partner Benefits', href: '/about' },
-      { name: 'Vendor Support', href: '/contact' }
+      { name: 'Vendor Support', href: '/contact-us' }
     ],
     Legal: [
-      { name: 'Privacy Policy', href: '/privacy' },
-      { name: 'Terms of Service', href: '/terms' },
-      { name: 'Contact Legal', href: '/contact' },
-      { name: 'Cookie Policy', href: '/privacy' }
+      { name: 'Privacy Policy', href: '/privacy-policy' },
+      { name: 'Terms of Service', href: '/terms-and-conditions' },
+      { name: 'Contact Legal', href: '/contact-us' },
+      { name: 'Cookie Policy', href: '/privacy-policy' }
     ]
   };
 

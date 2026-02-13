@@ -43,6 +43,7 @@ import {
   updateUserStatus,
   fetchAllVendorsAdmin,
   fetchVendorById,
+  fetchVendorByIdAdmin,
   toggleVendorVerification,
   toggleVendorStatus,
   deleteVendorPermanent,
@@ -795,7 +796,7 @@ const AdminPanel = () => {
                                 return;
                               }
 
-                              const data = await fetchVendorById(vendorId);
+                              const data = await fetchVendorByIdAdmin(vendorId);
                               if (data) setSelectedItem(data);
                               else showNotification('error', 'Vendor not found');
                             } catch (err) {
@@ -1330,27 +1331,33 @@ const AdminPanel = () => {
               <button onClick={() => setSelectedItem(null)} className="text-gray-600 hover:text-gray-900"><X className="w-5 h-5" /></button>
             </div>
 
-            {/* User */}
-            {selectedItem.name && (
+            {/* Vendor - CHECK FIRST (vendors have 'name' too, so check serviceType or contact) */}
+            {(selectedItem.serviceType || selectedItem.contact) && (
+              <div className="space-y-3">
+                <p className="text-lg font-bold text-gray-900">{selectedItem.businessName || selectedItem.name}</p>
+                <div className="space-y-2 text-sm">
+                  <p className="text-gray-700"><span className="font-semibold">Email:</span> {selectedItem.contact?.email || selectedItem.contactInfo?.email || 'N/A'}</p>
+                  {selectedItem.contact?.phone && <p className="text-gray-700"><span className="font-semibold">Phone:</span> {selectedItem.contact.phone}</p>}
+                  <p className="text-gray-600"><span className="font-semibold">Service:</span> {selectedItem.serviceType || 'N/A'}</p>
+                  <p className="text-gray-600"><span className="font-semibold">City:</span> {selectedItem.city || 'N/A'}</p>
+                  <p className="text-gray-600"><span className="font-semibold">Verified:</span> <span className={selectedItem.verified ? 'text-green-600 font-medium' : 'text-gray-500'}>{selectedItem.verified ? '✓ Yes' : 'No'}</span></p>
+                  <p className="text-gray-600"><span className="font-semibold">Status:</span> <span className={selectedItem.isActive ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>{selectedItem.isActive ? 'Active' : 'Inactive'}</span></p>
+                  {selectedItem.rating && <p className="text-gray-600"><span className="font-semibold">Rating:</span> {selectedItem.rating} ⭐ ({selectedItem.reviewCount || 0} reviews)</p>}
+                  {selectedItem.pricing && (
+                    <p className="text-gray-600"><span className="font-semibold">Pricing:</span> ₹{selectedItem.pricing.min?.toLocaleString()} - ₹{selectedItem.pricing.max?.toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* User - CHECK AFTER VENDOR */}
+            {selectedItem.role && !selectedItem.serviceType && (
               <div className="space-y-2">
                 <p className="text-lg font-bold">{selectedItem.name}</p>
                 <p className="text-sm text-gray-600">{selectedItem.email}</p>
                 {selectedItem.phone && <p className="text-sm text-gray-600">{selectedItem.phone}</p>}
                 <p className="text-sm text-gray-500">Role: {selectedItem.role || 'user'}</p>
                 <p className="text-sm text-gray-500">Joined: {selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleString() : 'N/A'}</p>
-              </div>
-            )}
-
-            {/* Vendor */}
-            {selectedItem.businessName && (
-              <div className="space-y-2">
-                <p className="text-lg font-bold">{selectedItem.businessName}</p>
-                <p className="text-sm text-gray-600">Contact: {selectedItem.contact?.email || selectedItem.email}</p>
-                {selectedItem.contact?.phone && <p className="text-sm text-gray-600">Phone: {selectedItem.contact.phone}</p>}
-                <p className="text-sm text-gray-500">Service: {selectedItem.serviceType || 'N/A'}</p>
-                <p className="text-sm text-gray-500">City: {selectedItem.city || 'N/A'}</p>
-                <p className="text-sm text-gray-500">Verified: {selectedItem.verified ? 'Yes' : 'No'}</p>
-                <p className="text-sm text-gray-500">Status: {selectedItem.isActive ? 'Active' : 'Inactive'}</p>
               </div>
             )}
 

@@ -173,7 +173,7 @@ const HowItWorks = () => {
                 Start Planning
               </Button>
             </Link>
-            <Link to="/contact">
+            <Link to="/contact-us">
               <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-indigo-600">
                 Talk to an Expert
               </Button>

@@ -36,6 +36,13 @@ router.patch('/users/:userId', adminController.updateUserStatus);
 router.get('/vendors', adminController.getAllVendors);
 
 /**
+ * @route   GET /api/admin/vendors/:vendorId
+ * @desc    Get single vendor by ID (includes inactive)
+ * @access  Admin
+ */
+router.get('/vendors/:vendorId', adminController.getVendorById);
+
+/**
  * @route   PATCH /api/admin/vendors/:vendorId/verify
  * @desc    Verify or unverify a vendor
  * @access  Admin

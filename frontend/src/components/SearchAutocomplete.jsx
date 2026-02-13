@@ -28,6 +28,7 @@ const SearchAutocomplete = ({
   minChars = 1,
   maxSuggestions = 12,
   className = '',
+  inputClassName = '',
   showIcon = true,
   autoFocus = false
 }) => {
@@ -309,6 +310,7 @@ const SearchAutocomplete = ({
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
             placeholder-gray-400 text-gray-900
             transition-colors duration-200
+            ${inputClassName}
           `}
           aria-label="Search input"
           aria-autocomplete="list"

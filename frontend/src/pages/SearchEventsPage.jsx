@@ -433,7 +433,7 @@ const SearchEventsPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Search Bar */}
-      <div className="bg-white border-b sticky top-16 md:top-20 z-30 shadow-sm">
+      <div className="bg-white border-b sticky top-16 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
             <div className="flex-1 order-1">
@@ -449,13 +449,15 @@ const SearchEventsPage = () => {
                   setSearchQuery(value);
                 }}
                 placeholder="Search for event services, venues, photographers..."
+                className="h-full"
+                inputClassName="h-12"
                 showIcon={true}
                 debounceMs={200}
                 maxSuggestions={15}
               />
             </div>
             {/* Location Input with City/Area Dropdowns */}
-            <div className="w-full sm:w-80 relative flex items-center gap-2 px-3 py-2.5 border border-gray-300 rounded-sm bg-white order-2">
+            <div className="w-full sm:w-80 relative flex items-center gap-2 px-3 h-12 border border-gray-300 rounded-sm bg-white order-2">
               <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
               
               {/* City Dropdown */}
@@ -550,7 +552,7 @@ const SearchEventsPage = () => {
             </div>
             <button 
               type="submit"
-              className="w-full sm:w-auto px-8 py-2.5 bg-blue-600 text-white rounded-sm font-medium text-sm
+              className="w-full sm:w-auto px-8 h-12 bg-blue-600 text-white rounded-sm font-medium text-sm
                        hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
             >
               <Search className="w-4 h-4" />

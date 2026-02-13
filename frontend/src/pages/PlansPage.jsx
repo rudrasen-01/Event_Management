@@ -107,9 +107,10 @@ const PlansPage = () => {
     if (planId === 'free') {
       navigate('/vendor-registration');
     } else if (planId === 'enterprise') {
-      navigate('/contact?subject=enterprise-plan');
+      navigate('/contact-us?subject=Premium Plan Inquiry');
     } else {
-      navigate(`/subscribe/${planId}?billing=${billingCycle}`);
+      // Redirect to vendor registration with plan info
+      navigate(`/vendor-registration?plan=${planId}&billing=${billingCycle}`);
     }
   };
 

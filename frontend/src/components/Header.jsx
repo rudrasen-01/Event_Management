@@ -35,7 +35,7 @@ const Header = () => {
     { name: 'Search Events', href: '/search', showForAdmin: false },
     { name: 'How It Works', href: '/how-it-works', showForAdmin: false },
     { name: 'FAQ', href: '/faq', showForAdmin: false },
-    { name: 'Contact', href: '/contact', showForAdmin: false },
+    { name: 'Contact', href: '/contact-us', showForAdmin: false },
     { name: 'Plans', href: '/plans', showForAdmin: false }
   ];
 
@@ -85,13 +85,13 @@ const Header = () => {
   };
 
   return (
-    <header className={`sticky top-0 z-50 transition-all duration-300 ${
+    <header className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ${
       scrolled 
         ? 'bg-white/95 backdrop-blur-lg shadow-lg border-b border-gray-200/50' 
         : 'bg-white/90 backdrop-blur-sm shadow-sm border-b border-gray-100'
     }`}>
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+        <div className="flex items-center justify-between h-16">
           {/* Logo - Optimized for No Overflow */}
           <Link to="/" className="flex items-center space-x-2 sm:space-x-3 group flex-shrink-0">
             <div className="relative">
@@ -108,49 +108,48 @@ const Header = () => {
             </div>
           </Link>
 
-          {/* Desktop Navigation - Compact Design */}
-          <div className="hidden lg:flex items-center flex-1 justify-center px-4">
-            <div className="flex items-center space-x-1 bg-gray-50/80 backdrop-blur-sm rounded-full px-2 py-1.5 shadow-inner">
+          {/* Desktop Navigation - Enhanced Design */}
+          <div className="hidden lg:flex items-center flex-1 justify-center px-6">
+            <div className="flex items-center space-x-2 bg-gray-50/80 backdrop-blur-sm rounded-full px-3 py-2 shadow-inner">
               {filteredNavItems.map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`relative px-3 xl:px-4 py-1.5 rounded-full font-medium text-xs xl:text-sm transition-all duration-300 whitespace-nowrap ${
+                  className={`relative px-4 py-2 rounded-full font-semibold text-sm transition-all duration-300 whitespace-nowrap ${
                     isActive(item.href)
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                      : 'text-gray-700 hover:text-indigo-600 hover:bg-white/70'
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105'
+                      : 'text-gray-700 hover:text-indigo-600 hover:bg-white/80 hover:shadow-sm'
                   }`}
                 >
                   {item.name}
                   {isActive(item.href) && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full"></span>
+                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-lg"></span>
                   )}
                 </Link>
               ))}
             </div>
           </div>
 
-          {/* Desktop Auth Buttons - Compact Design */}
-          <div className="hidden lg:flex items-center space-x-2 flex-shrink-0">
+          {/* Desktop Auth Buttons - Enhanced Design */}
+          <div className="hidden lg:flex items-center space-x-3 flex-shrink-0">
             {/* Guest View - Vendor Buttons */}
             {!isAuthenticated() && !isVendor && (
               <>
                 <button
                   onClick={handleVendorDashboardClick}
-                  className="relative px-3 xl:px-4 py-2 text-gray-700 font-semibold text-xs xl:text-sm rounded-lg hover:text-indigo-600 transition-all duration-200 hover:bg-gray-50 whitespace-nowrap"
+                  className="relative px-4 py-2.5 text-gray-700 font-semibold text-sm rounded-lg hover:text-indigo-600 transition-all duration-200 hover:bg-gray-50 whitespace-nowrap"
                 >
                   Vendor
                 </button>
 
                 <Link 
                   to="/vendor-registration"
-                  className="group relative px-3 xl:px-4 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-semibold text-xs xl:text-sm rounded-lg overflow-hidden shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+                  className="group relative px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-semibold text-sm rounded-lg overflow-hidden shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <span className="relative flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-                    <span className="hidden xl:inline">Partner</span>
-                    <span className="xl:hidden">Join</span>
+                  <span className="relative flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Partner</span>
                   </span>
                 </Link>
               </>
@@ -350,10 +349,10 @@ const Header = () => {
             ) : (
               <button
                 onClick={() => setShowUserLoginModal(true)}
-                className="group relative flex items-center gap-1.5 px-3 xl:px-5 py-2 bg-white border-2 border-indigo-600 text-indigo-600 font-semibold text-xs xl:text-sm rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 whitespace-nowrap"
+                className="group relative flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-indigo-600 text-indigo-600 font-semibold text-sm rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 whitespace-nowrap"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <UserIcon className="w-4 h-4 xl:w-5 xl:h-5 relative z-10 group-hover:text-white transition-colors" />
+                <UserIcon className="w-4 h-4 relative z-10 group-hover:text-white transition-colors" />
                 <span className="relative z-10 group-hover:text-white transition-colors">Login</span>
               </button>
             )}

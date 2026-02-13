@@ -192,7 +192,7 @@ const FAQ = () => {
             Cannot find what you are looking for? Our support team is here to help you with any questions about our platform or services.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={() => navigate('/contact')}>
+            <Button size="lg" onClick={() => navigate('/contact-us')}>
               Contact Support
             </Button>
             <Button variant="outline" size="lg" onClick={() => window.location.href = 'mailto:support@aissignatureevent.com'}>

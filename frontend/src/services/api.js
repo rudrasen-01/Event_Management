@@ -450,6 +450,24 @@ export const fetchAllVendorsAdmin = async (params = {}) => {
 };
 
 /**
+ * ADMIN: Get single vendor by ID (includes inactive vendors)
+ * @param {string} vendorId - Vendor ID
+ * @returns {Promise<Object>} Vendor object
+ */
+export const fetchVendorByIdAdmin = async (vendorId) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await apiClient.get(`/admin/vendors/${vendorId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return response.success ? response.data : null;
+  } catch (error) {
+    console.error('Error fetching vendor:', error);
+    throw error;
+  }
+};
+
+/**
  * ADMIN: Toggle vendor verification status
  * @param {string} vendorId - Vendor ID
  * @param {boolean} verified - Verification status

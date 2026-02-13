@@ -1,14 +1,15 @@
 /**
  * DYNAMIC SERVICE & FILTER API
  * ============================
- * Runtime OSM Integration - Zero Database Dependencies
+ * Database-driven city and area data from MongoDB Atlas
  */
 
 const express = require('express');
 const router = express.Router();
 const Vendor = require('../models/VendorNew');
 const Service = require('../models/Service');
-const { fetchCitiesFromOSM, fetchAreasForCity } = require('../services/overpassService');
+const City = require('../models/City');
+const Area = require('../models/Area');
 
 /**
  * GET /api/dynamic/service-types
@@ -58,51 +59,33 @@ router.get('/service-types', async (req, res) => {
 
 /**
  * GET /api/dynamic/cities
- * Fetches cities from OpenStreetMap via Overpass API at runtime
- * Enhanced with vendor counts from database
- * Zero persistence of city data, only runtime fetches
+ * Fetches cities from MongoDB Atlas database
+ * Fast and reliable - all 4,940 Indian cities available
  */
 router.get('/cities', async (req, res) => {
   try {
-    const cities = await fetchCitiesFromOSM();
+    // Fetch all cities from database (optimized - no vendor count to keep it fast)
+    const cities = await City.find({})
+      .select('name state areaCount')
+      .sort({ name: 1 })
+      .lean();
     
-    // Get vendor counts for each city from database
-    const citiesWithCounts = await Promise.all(
-      cities.map(async (city) => {
-        try {
-          const count = await Vendor.countDocuments({ 
-            city: new RegExp(`^${city.name}$`, 'i'),
-            isActive: true 
-          });
-          
-          return {
-            name: city.name,
-            state: 'India', // OSM cities don't have state info, can be enhanced later
-            count: count || 0
-          };
-        } catch (err) {
-          return {
-            name: city.name,
-            state: 'India',
-            count: 0
-          };
-        }
-      })
-    );
+    // Format cities for response (no vendor count for speed)
+    const citiesData = cities.map(city => ({
+      name: city.name,
+      state: city.state || 'India',
+      count: 0  // Will add vendor count optimization later if needed
+    }));
     
-    // Sort: cities with vendors first, then alphabetically
-    citiesWithCounts.sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name);
-    });
+    console.log(`📡 /api/dynamic/cities - Returning ${citiesData.length} cities`);
     
     res.json({
       success: true,
-      data: citiesWithCounts,
-      total: citiesWithCounts.length
+      data: citiesData,
+      total: citiesData.length
     });
   } catch (error) {
-    console.error('Error fetching cities from OSM:', error);
+    console.error('Error fetching cities from database:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message,
@@ -113,9 +96,8 @@ router.get('/cities', async (req, res) => {
 
 /**
  * GET /api/dynamic/areas
- * Fetches areas for a city from OpenStreetMap via Overpass API at runtime
+ * Fetches areas for a city from MongoDB Atlas database
  * Query param: city (required)
- * Zero persistence, zero static data
  */
 router.get('/areas', async (req, res) => {
   try {
@@ -129,16 +111,37 @@ router.get('/areas', async (req, res) => {
       });
     }
     
-    const areas = await fetchAreasForCity(city);
+    // Find city first
+    const cityDoc = await City.findOne({ 
+      name: new RegExp(`^${city}$`, 'i') 
+    });
+    
+    if (!cityDoc) {
+      return res.json({
+        success: true,
+        data: [],
+        total: 0,
+        city: city,
+        message: 'City not found'
+      });
+    }
+    
+    // Fetch areas from database
+    const areas = await Area.find({ 
+      cityOsmId: cityDoc.osm_id 
+    })
+    .select('name')
+    .sort({ name: 1 })
+    .lean();
     
     res.json({
       success: true,
-      data: areas,
+      data: areas.map(a => ({ name: a.name })),
       total: areas.length,
       city: city
     });
   } catch (error) {
-    console.error('Error fetching areas from OSM:', error);
+    console.error('Error fetching areas from database:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message,

@@ -253,6 +253,33 @@ exports.getAllVendors = async (req, res, next) => {
 };
 
 /**
+ * Get Single Vendor by ID (Admin - includes inactive vendors)
+ */
+exports.getVendorById = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+
+    const vendor = await Vendor.findById(vendorId).lean();
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Vendor not found' }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: vendor
+    });
+
+  } catch (error) {
+    console.error('Error fetching vendor:', error);
+    next(error);
+  }
+};
+
+/**
  * Verify/Unverify Vendor
  */
 exports.toggleVendorVerification = async (req, res, next) => {

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-react';
 import Button from '../components/Button';
 import { useToast } from '../components/Toast';
@@ -6,6 +7,7 @@ import { validateForm } from '../utils/validation';
 
 const Contact = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -16,6 +18,14 @@ const Contact = () => {
     inquiryType: 'general'
   });
   const [errors, setErrors] = useState({});
+
+  // Pre-fill subject from query parameters
+  useEffect(() => {
+    const subjectParam = searchParams.get('subject');
+    if (subjectParam) {
+      setFormData(prev => ({ ...prev, subject: subjectParam }));
+    }
+  }, [searchParams]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));

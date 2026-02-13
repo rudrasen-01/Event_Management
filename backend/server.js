@@ -28,6 +28,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const dynamicRoutes = require('./routes/dynamicRoutes');
 const taxonomyRoutes = require('./routes/taxonomyRoutes');
 const vendorProfileRoutes = require('./routes/vendorProfileRoutes');
+const locationRoutes = require('./routes/locationRoutes');
 
 // Use Routes
 app.use('/api/services', serviceRoutes);
@@ -39,6 +40,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/dynamic', dynamicRoutes); // Dynamic data endpoints
 app.use('/api/taxonomy', taxonomyRoutes); // Master taxonomy system
 app.use('/api/vendor-profile', vendorProfileRoutes); // Vendor profile management
+app.use('/api/locations', locationRoutes); // Cities and areas from OSM
 
 // Detect service intent endpoint (special case - not under /services)
 const { detectServiceIntent } = require('./controllers/serviceController');
@@ -104,6 +106,15 @@ app.get('/', (req, res) => {
         updateStatus: 'PATCH /api/inquiries/:inquiryId/status',
         delete: 'DELETE /api/inquiries/:inquiryId',
         stats: 'GET /api/inquiries/stats'
+      },
+      locations: {
+        searchCities: 'GET /api/locations/cities/search?q=Mumbai',
+        nearbyCities: 'GET /api/locations/cities/nearby?lat=19.0760&lon=72.8777&radius=50000',
+        cityById: 'GET /api/locations/cities/:cityId',
+        cityAreas: 'GET /api/locations/cities/:cityId/areas',
+        searchAreas: 'GET /api/locations/areas/search?cityId=xxx&q=Bandra',
+        nearbyAreas: 'GET /api/locations/areas/nearby?lat=19.0596&lon=72.8295&radius=25000',
+        stats: 'GET /api/locations/stats'
       }
     }
   });
