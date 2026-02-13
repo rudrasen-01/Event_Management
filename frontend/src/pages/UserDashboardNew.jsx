@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import StatusBadge from '../components/StatusBadge';
+import { getApiUrl } from '../config/api';
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -73,7 +74,7 @@ const UserDashboard = () => {
       // Backend automatically filters inquiries based on logged-in user
       // No need to pass userContact - backend uses req.user.email and req.user.phone
       const response = await fetch(
-        `http://localhost:5000/api/inquiries`,
+        getApiUrl('inquiries'),
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -115,7 +116,7 @@ const UserDashboard = () => {
   const handleUpdateProfile = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5000/api/users/profile', {
+      const response = await fetch(getApiUrl('users/profile'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
