@@ -1,23 +1,24 @@
 /**
- * API configuration helpers.
- * Ensures every call uses the same host that comes from Vite env variables.
+ * API Configuration
+ * Centralized configuration for all API requests
+ * Uses environment variables with fallback for development
  */
 
-const normalizeBaseUrl = (input) => {
-  if (!input) return 'http://localhost:5000';
-  return input.trim().replace(/\/+$/, '');
-};
+// Get API base URL from environment variable
+// In production, set VITE_API_URL in your hosting platform's environment variables
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-export const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL);
-
+// Export configured API URL
 export const getApiUrl = (endpoint = '') => {
-  const cleanEndpoint = endpoint.replace(/^\/+/, '');
-  return `${API_BASE_URL}/api${cleanEndpoint ? `/${cleanEndpoint}` : ''}`;
+  // Remove leading slash from endpoint if present
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+  
+  // Remove /api suffix from base URL if endpoint includes it
+  const baseUrl = API_BASE_URL.endsWith('/api') ? API_BASE_URL : `${API_BASE_URL}/api`;
+  
+  // Return full URL
+  return cleanEndpoint ? `${baseUrl}/${cleanEndpoint}` : baseUrl;
 };
 
-export const getAbsoluteUrl = (path = '') => {
-  const cleanPath = path.replace(/^\/+/, '');
-  return cleanPath ? `${API_BASE_URL}/${cleanPath}` : API_BASE_URL;
-};
-
+// Export base URL for legacy code
 export default API_BASE_URL;

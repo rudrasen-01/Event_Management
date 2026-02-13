@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getApiUrl } from '../config/api';
 
 const AuthContext = createContext(null);
 
@@ -44,7 +43,7 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (email, password) => {
     try {
-      const response = await fetch(getApiUrl('users/login'), {
+      const response = await fetch('http://localhost:5000/api/users/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -83,7 +82,7 @@ export const AuthProvider = ({ children }) => {
   // Register function
   const register = async (name, email, password, phone) => {
     try {
-      const response = await fetch(getApiUrl('users/register'), {
+      const response = await fetch('http://localhost:5000/api/users/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -119,8 +118,8 @@ export const AuthProvider = ({ children }) => {
     try {
       // Determine the endpoint based on user type
       const endpoint = userType === 'vendor' 
-        ? getApiUrl('vendors/google-login')
-        : getApiUrl('users/google-login');
+        ? 'http://localhost:5000/api/vendors/google-login'
+        : 'http://localhost:5000/api/users/google-login';
 
       const response = await fetch(endpoint, {
         method: 'POST',

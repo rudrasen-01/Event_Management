@@ -10,7 +10,8 @@
  */
 
 import axios from 'axios';
-import { getApiUrl } from '../config/api';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Cache configuration
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -67,7 +68,7 @@ export const fetchAutocomplete = async (query, limit = 12, signal = null) => {
   }
 
   try {
-    const response = await axios.get(getApiUrl('search/suggestions'), {
+    const response = await axios.get(`${API_BASE_URL}/search/suggestions`, {
       params: {
         q: trimmedQuery,
         limit

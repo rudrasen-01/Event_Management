@@ -8,11 +8,13 @@
 
 import axios from 'axios';
 import { getAllServices, searchTaxonomy } from './taxonomyService';
-import { getApiUrl } from '../config/api';
+
+// Base API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance
 const apiClient = axios.create({
-  baseURL: getApiUrl(),
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
