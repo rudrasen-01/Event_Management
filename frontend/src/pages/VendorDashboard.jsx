@@ -22,8 +22,9 @@ import StatusBadge from '../components/StatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 import VendorProfileEditor from '../components/vendor/VendorProfileEditor';
 import VendorPaymentDashboard from '../components/vendor/VendorPaymentDashboard';
+import { getApiUrl } from '../config/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = getApiUrl();
 
 const VendorDashboard = () => {
   const navigate = useNavigate();

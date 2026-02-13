@@ -6,8 +6,9 @@ import {
   ChevronRight, Receipt, Package, Zap, Building, Wallet, 
   X, Info, Smartphone
 } from 'lucide-react';
+import { getApiUrl } from '../../config/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = getApiUrl();
 
 const VendorPaymentDashboard = () => {
   const [subscription, setSubscription] = useState(null);

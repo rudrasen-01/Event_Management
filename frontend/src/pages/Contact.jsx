@@ -4,6 +4,7 @@ import { MapPin, Phone, Mail, Clock, Send, CheckCircle } from 'lucide-react';
 import Button from '../components/Button';
 import { useToast } from '../components/Toast';
 import { validateForm } from '../utils/validation';
+import { getApiUrl } from '../config/api';
 
 const Contact = () => {
   const { toast } = useToast();
@@ -68,7 +69,7 @@ const Contact = () => {
         status: 'pending'
       };
 
-      const response = await fetch('http://localhost:5000/api/inquiries', {
+      const response = await fetch(getApiUrl('inquiries'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

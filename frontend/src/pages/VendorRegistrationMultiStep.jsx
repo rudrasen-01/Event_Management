@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getAllServices } from '../services/taxonomyService';
 import { fetchCities } from '../services/dynamicDataService';
+import { getApiUrl } from '../config/api';
 import VendorLoginModal from '../components/VendorLoginModal';
 
 const VendorRegistrationMultiStep = () => {
@@ -369,7 +370,7 @@ const VendorRegistrationMultiStep = () => {
         description: formData.description.trim() || undefined
       };
 
-      const response = await fetch('http://localhost:5000/api/vendors/register', {
+      const response = await fetch(getApiUrl('vendors/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -430,7 +431,7 @@ const VendorRegistrationMultiStep = () => {
       // Step 1: Create payment order on backend
       const totalAmount = formData.planPrice + Math.round(formData.planPrice * 0.18);
       
-      const orderResponse = await fetch('http://localhost:5000/api/vendors/create-payment-order', {
+      const orderResponse = await fetch(getApiUrl('vendors/create-payment-order'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -468,7 +469,7 @@ const VendorRegistrationMultiStep = () => {
         // Verify payment on backend
         setPaymentState('verifying');
 
-        const verifyResponse = await fetch('http://localhost:5000/api/vendors/verify-payment', {
+        const verifyResponse = await fetch(getApiUrl('vendors/verify-payment'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

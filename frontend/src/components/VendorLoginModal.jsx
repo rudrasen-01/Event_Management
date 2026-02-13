@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
+import { getApiUrl } from '../config/api';
 
 const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [email, setEmail] = useState('');
@@ -29,7 +30,7 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/vendors/login', {
+      const response = await fetch(getApiUrl('vendors/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,7 +100,7 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         
         if (data.id_token) {
           // Send ID token to backend
-          const loginResponse = await fetch('http://localhost:5000/api/vendors/google-login', {
+          const loginResponse = await fetch(getApiUrl('vendors/google-login'), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

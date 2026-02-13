@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Send, User, Phone, DollarSign, Calendar, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import ModalErrorBoundary from './ModalErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../config/api';
 
 /**
  * InquiryModal Component
@@ -64,7 +65,7 @@ const InquiryModal = ({
     const fetchEventTypes = async () => {
       try {
         setLoadingEventTypes(true);
-        const response = await fetch('http://localhost:5000/api/services');
+        const response = await fetch(getApiUrl('services'));
         const raw = await response.text();
         let data;
         try {
@@ -296,7 +297,7 @@ const InquiryModal = ({
         status: 'pending'
       };
 
-      const response = await fetch('http://localhost:5000/api/inquiries', {
+      const response = await fetch(getApiUrl('inquiries'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
