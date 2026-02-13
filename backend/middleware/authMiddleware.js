@@ -165,8 +165,79 @@ const verifyVendorOwnership = async (req, res, next) => {
   }
 };
 
+/**
+ * Vendor-specific authentication middleware
+ * Verifies JWT token and ensures user is a vendor
+ */
+const vendorProtect = async (req, res, next) => {
+  try {
+    let token;
+    
+    // Check for token in Authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+    
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized. Please login as a vendor.'
+      });
+    }
+    
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-change-in-production');
+      
+      // Must be a vendor
+      if (decoded.role !== 'vendor') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Vendor role required.'
+        });
+      }
+      
+      // Fetch vendor from database
+      const vendor = await Vendor.findById(decoded.id).select('-password');
+      
+      if (!vendor) {
+        return res.status(401).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+      
+      if (!vendor.isActive) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your vendor account has been deactivated'
+        });
+      }
+      
+      // Attach vendor to request
+      req.vendor = vendor;
+      req.user = vendor; // Also attach to user for compatibility
+      next();
+      
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized. Invalid or expired token.'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Vendor auth error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Authentication failed'
+    });
+  }
+};
+
 module.exports = {
   protect,
   authorize,
-  verifyVendorOwnership
+  verifyVendorOwnership,
+  vendorProtect
 };

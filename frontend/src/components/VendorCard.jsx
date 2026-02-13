@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MapPin, DollarSign, Phone, Star, Clock, Award, ChevronRight, Briefcase, TrendingUp, CheckCircle } from 'lucide-react';
 import InquiryModal from './InquiryModal';
 import { useSearch } from '../contexts/SearchContext';
@@ -20,6 +21,7 @@ const VendorCard = ({
   prefilledEventType = ''
 }) => {
   const [showInquiryModal, setShowInquiryModal] = useState(false);
+  const navigate = useNavigate();
   
   // Access search filters from context
   const { filters } = useSearch();
@@ -29,6 +31,14 @@ const VendorCard = ({
       onInquiry(vendor);
     }
     setShowInquiryModal(true);
+  };
+
+  const handleViewDetails = () => {
+    // Navigate to vendor profile page
+    const vendorId = vendor._id || vendor.id;
+    if (vendorId) {
+      navigate(`/vendor/${vendorId}`);
+    }
   };
 
   // Format pricing display
@@ -207,6 +217,7 @@ const VendorCard = ({
           </button>
 
           <button
+            onClick={handleViewDetails}
             className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-sm rounded-lg transition-all flex items-center justify-center"
             title="View Details"
           >

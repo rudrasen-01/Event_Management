@@ -32,13 +32,18 @@ exports.registerUser = async (req, res, next) => {
       });
     }
     
-    // Create user (only allow 'user' role during registration, admin must be set manually)
+    // Check if this is the first user - make them admin automatically
+    const userCount = await User.countDocuments();
+    const isFirstUser = userCount === 0;
+    const userRole = isFirstUser ? 'admin' : 'user';
+    
+    // Create user
     const user = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
       phone: phone || undefined,
-      role: 'user' // Always default to 'user' - admins created manually
+      role: userRole
     });
     
     // Generate token
@@ -54,7 +59,9 @@ exports.registerUser = async (req, res, next) => {
         user: user.getPublicProfile(),
         token
       },
-      message: 'Registration successful'
+      message: isFirstUser 
+        ? '🎉 Registration successful! You are the first user and have been granted admin access.' 
+        : 'Registration successful'
     });
     
   } catch (error) {

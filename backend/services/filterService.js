@@ -302,7 +302,6 @@ const applyFiltersToResults = (vendors, filters = {}) => {
   if (filters.area) {
     filtered = filtered.filter(vendor => vendor.area === filters.area);
   }
-
   // Service type filter
   if (filters.serviceType) {
     const serviceTypes = Array.isArray(filters.serviceType) 

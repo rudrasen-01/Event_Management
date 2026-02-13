@@ -285,7 +285,96 @@ const vendorSchema = new mongoose.Schema({
   rejectionReason: String,
   
   approvedAt: Date,
-  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  
+  // Subscription & Payment
+  subscription: {
+    planId: {
+      type: String,
+      enum: ['free', 'starter', 'growth', 'premium'],
+      default: 'free',
+      index: true
+    },
+    planName: {
+      type: String,
+      default: 'Free'
+    },
+    status: {
+      type: String,
+      enum: ['active', 'expired', 'cancelled', 'pending'],
+      default: 'active',
+      index: true
+    },
+    amount: {
+      type: Number,
+      default: 0
+    },
+    paymentId: String,
+    orderId: String,
+    startDate: {
+      type: Date,
+      default: Date.now
+    },
+    expiryDate: {
+      type: Date,
+      default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days free trial
+    },
+    autoRenew: {
+      type: Boolean,
+      default: false
+    },
+    features: [String],
+    billingCycle: {
+      type: String,
+      enum: ['monthly', 'yearly', 'lifetime'],
+      default: 'lifetime' // free plan is lifetime
+    }
+  },
+  
+  // Payment History
+  paymentHistory: [{
+    paymentId: {
+      type: String,
+      required: true,
+      index: true
+    },
+    orderId: {
+      type: String,
+      required: true
+    },
+    amount: {
+      type: Number,
+      required: true
+    },
+    gst: Number,
+    totalAmount: Number,
+    planId: {
+      type: String,
+      required: true
+    },
+    planName: String,
+    status: {
+      type: String,
+      enum: ['pending', 'success', 'failed', 'refunded'],
+      default: 'pending',
+      index: true
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['upi', 'card', 'netbanking', 'wallet', 'other'],
+      required: true
+    },
+    paidAt: {
+      type: Date,
+      default: Date.now
+    },
+    razorpaySignature: String,
+    receiptUrl: String,
+    receiptNumber: String,
+    failureReason: String,
+    refundedAt: Date,
+    refundAmount: Number
+  }]
   
 }, {
   timestamps: true,

@@ -1,12 +1,14 @@
 /**
  * DYNAMIC SERVICE & FILTER API
- * Production-ready endpoints for scalable marketplace
+ * ============================
+ * Runtime OSM Integration - Zero Database Dependencies
  */
 
 const express = require('express');
 const router = express.Router();
 const Vendor = require('../models/VendorNew');
 const Service = require('../models/Service');
+const { fetchCitiesFromOSM, fetchAreasForCity } = require('../services/overpassService');
 
 /**
  * GET /api/dynamic/service-types
@@ -56,39 +58,92 @@ router.get('/service-types', async (req, res) => {
 
 /**
  * GET /api/dynamic/cities
- * Returns all unique cities from actual vendors in database
- * Used for location filters - always reflects current coverage
+ * Fetches cities from OpenStreetMap via Overpass API at runtime
+ * Enhanced with vendor counts from database
+ * Zero persistence of city data, only runtime fetches
  */
 router.get('/cities', async (req, res) => {
   try {
-    const cities = await Vendor.distinct('city', { isActive: true });
+    const cities = await fetchCitiesFromOSM();
     
-    // Enrich with vendor counts
-    const enriched = await Promise.all(
-      cities.filter(city => city).map(async (city) => {
-        const count = await Vendor.countDocuments({ 
-          city, 
-          isActive: true 
-        });
-        
-        return {
-          name: city,
-          count,
-          state: 'India' // Can be enhanced with state mapping
-        };
+    // Get vendor counts for each city from database
+    const citiesWithCounts = await Promise.all(
+      cities.map(async (city) => {
+        try {
+          const count = await Vendor.countDocuments({ 
+            city: new RegExp(`^${city.name}$`, 'i'),
+            isActive: true 
+          });
+          
+          return {
+            name: city.name,
+            state: 'India', // OSM cities don't have state info, can be enhanced later
+            count: count || 0
+          };
+        } catch (err) {
+          return {
+            name: city.name,
+            state: 'India',
+            count: 0
+          };
+        }
       })
     );
     
-    // Sort alphabetically
-    enriched.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort: cities with vendors first, then alphabetically
+    citiesWithCounts.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
     
     res.json({
       success: true,
-      data: enriched.filter(c => c.count > 0)
+      data: citiesWithCounts,
+      total: citiesWithCounts.length
     });
   } catch (error) {
-    console.error('Error fetching cities:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Error fetching cities from OSM:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      data: []
+    });
+  }
+});
+
+/**
+ * GET /api/dynamic/areas
+ * Fetches areas for a city from OpenStreetMap via Overpass API at runtime
+ * Query param: city (required)
+ * Zero persistence, zero static data
+ */
+router.get('/areas', async (req, res) => {
+  try {
+    const { city } = req.query;
+    
+    if (!city) {
+      return res.status(400).json({
+        success: false,
+        error: 'city query parameter is required',
+        data: []
+      });
+    }
+    
+    const areas = await fetchAreasForCity(city);
+    
+    res.json({
+      success: true,
+      data: areas,
+      total: areas.length,
+      city: city
+    });
+  } catch (error) {
+    console.error('Error fetching areas from OSM:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      data: []
+    });
   }
 });
 
@@ -243,21 +298,30 @@ router.get('/search-suggestions', async (req, res) => {
       });
     });
     
-    // 3. Matching cities
-    const cities = await Vendor.distinct('city', {
-      city: regex,
-      isActive: true
-    });
+    // 3. Matching cities from OSM with smart ranking
+    const allCities = await fetchCitiesFromOSM();
+    const searchQuery = q.toLowerCase();
     
-    cities.slice(0, 2).forEach(city => {
-      suggestions.push({
+    const matchingCities = allCities
+      .filter(city => city.name.toLowerCase().includes(searchQuery))
+      .map(city => {
+        const cityLower = city.name.toLowerCase();
+        // Priority: exact match > starts with > contains
+        const priority = cityLower === searchQuery ? 10 : 
+                        cityLower.startsWith(searchQuery) ? 5 : 1;
+        return { ...city, searchPriority: priority };
+      })
+      .sort((a, b) => b.searchPriority - a.searchPriority)
+      .slice(0, 5)
+      .map(city => ({
         type: 'city',
-        text: city,
+        text: city.name,
         subtext: 'Location',
         icon: '📍',
         priority: 1
-      });
-    });
+      }));
+    
+    suggestions.push(...matchingCities);
     
     // Sort by priority (vendors first)
     suggestions.sort((a, b) => b.priority - a.priority);
@@ -303,57 +367,6 @@ router.get('/filter-stats', async (req, res) => {
     });
   } catch (error) {
     console.error('Error calculating filter stats:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/dynamic/areas?city=xxx
- * Returns all unique areas for a specific city from actual vendors
- * Used for area dropdowns - always reflects current coverage
- */
-router.get('/areas', async (req, res) => {
-  try {
-    const { city } = req.query;
-    
-    if (!city) {
-      return res.status(400).json({
-        success: false,
-        message: 'city query parameter is required'
-      });
-    }
-    
-    // Get distinct areas from vendors in the specified city
-    const areas = await Vendor.distinct('area', { 
-      city: new RegExp(`^${city}$`, 'i'),
-      isActive: true 
-    });
-    
-    // Filter out empty/null areas and enrich with counts
-    const enriched = await Promise.all(
-      areas.filter(area => area && area.trim()).map(async (area) => {
-        const count = await Vendor.countDocuments({ 
-          city: new RegExp(`^${city}$`, 'i'),
-          area,
-          isActive: true 
-        });
-        
-        return {
-          name: area,
-          count
-        };
-      })
-    );
-    
-    // Sort alphabetically
-    enriched.sort((a, b) => a.name.localeCompare(b.name));
-    
-    res.json({
-      success: true,
-      data: enriched.filter(a => a.count > 0)
-    });
-  } catch (error) {
-    console.error('Error fetching areas:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

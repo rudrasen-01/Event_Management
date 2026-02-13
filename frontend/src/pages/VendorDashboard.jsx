@@ -16,10 +16,12 @@ import {
   Mail, Phone, Calendar, DollarSign, MapPin, Clock,
   CheckCircle, AlertCircle, RefreshCw, Eye, MessageCircle,
   TrendingUp, BarChart3, Filter, Search, X, Send,
-  Building2, User, FileText, Award, Bell
+  Building2, User, FileText, Award, Bell, UserCircle, CreditCard
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
+import VendorProfileEditor from '../components/vendor/VendorProfileEditor';
+import VendorPaymentDashboard from '../components/vendor/VendorPaymentDashboard';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -75,6 +77,18 @@ const VendorDashboard = () => {
       loadInquiries();
     }
   }, [activeTab]);
+
+  // Listen for tab change events from header dropdown
+  useEffect(() => {
+    const handleTabChange = (event) => {
+      if (event.detail) {
+        setActiveTab(event.detail);
+      }
+    };
+    
+    window.addEventListener('changeVendorTab', handleTabChange);
+    return () => window.removeEventListener('changeVendorTab', handleTabChange);
+  }, []);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -415,10 +429,11 @@ const VendorDashboard = () => {
             </div>
           </button>
           <button
+            onClick={() => setActiveTab('profile')}
             className="flex items-center gap-4 p-5 bg-gradient-to-br from-purple-50 to-pink-100 hover:from-purple-100 hover:to-pink-200 rounded-xl transition-all transform hover:scale-105 shadow-md hover:shadow-xl"
           >
             <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
-              <Award className="w-6 h-6 text-white" />
+              <UserCircle className="w-6 h-6 text-white" />
             </div>
             <div className="text-left">
               <p className="font-bold text-gray-900">Your Profile</p>
@@ -697,7 +712,9 @@ const VendorDashboard = () => {
           <nav className="flex space-x-8">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-              { id: 'inquiries', label: `Inquiries (${inquiries.length})`, icon: Mail }
+              { id: 'inquiries', label: `Inquiries (${inquiries.length})`, icon: Mail },
+              { id: 'payments', label: 'Subscription', icon: CreditCard },
+              { id: 'profile', label: 'My Profile', icon: UserCircle }
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -729,6 +746,8 @@ const VendorDashboard = () => {
           <>
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'inquiries' && renderInquiries()}
+            {activeTab === 'payments' && <VendorPaymentDashboard />}
+            {activeTab === 'profile' && <VendorProfileEditor />}
           </>
         )}
       </div>

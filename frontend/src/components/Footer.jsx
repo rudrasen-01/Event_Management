@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, Heart } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Linkedin, Youtube, Mail, Phone, MapPin, Heart } from 'lucide-react';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -33,10 +33,11 @@ const Footer = () => {
   };
 
   const socialLinks = [
-    { icon: Facebook, href: '#', label: 'Facebook' },
-    { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Instagram, href: '#', label: 'Instagram' },
-    { icon: Linkedin, href: '#', label: 'LinkedIn' }
+    { icon: Facebook, href: 'https://www.facebook.com/AISSignatureEvent/', label: 'Facebook' },
+    { icon: Twitter, href: 'https://x.com/AISSignature', label: 'Twitter' },
+    { icon: Instagram, href: 'https://www.instagram.com/aissignatureevent/', label: 'Instagram' },
+    { icon: Youtube, href: 'https://www.youtube.com/@AISSignatureEvent', label: 'YouTube' },
+    { icon: Linkedin, href: 'https://www.linkedin.com/company/ais-signature-event/', label: 'LinkedIn' }
   ];
 
   return (
@@ -125,8 +126,8 @@ const Footer = () => {
               <Mail className="w-5 h-5 text-indigo-400 mt-1" />
               <div>
                 <div className="text-white font-semibold text-sm">Email</div>
-                <a href="mailto:contact@ais-events.com" className="text-sm hover:text-indigo-400">
-                  contact@ais-events.com
+                <a href="mailto:info@aissignatureevent.com" className="text-sm hover:text-indigo-400">
+                  info@aissignatureevent.com
                 </a>
               </div>
             </div>
@@ -134,17 +135,17 @@ const Footer = () => {
               <Phone className="w-5 h-5 text-indigo-400 mt-1" />
               <div>
                 <div className="text-white font-semibold text-sm">Phone</div>
-                <a href="tel:+911234567890" className="text-sm hover:text-indigo-400">
-                  +91 12345 67890
+                <a href="tel:+919220836393" className="text-sm hover:text-indigo-400">
+                  +91 9220836393
                 </a>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <MapPin className="w-5 h-5 text-indigo-400 mt-1" />
               <div>
-                <div className="text-white font-semibold text-sm">Address</div>
+                <div className="text-white font-semibold text-sm">Company</div>
                 <p className="text-sm">
-                  Indore, Madhya Pradesh, India
+                  ORBOSIS VIBEZ EVENT & MARKETING PRIVATE LIMITED
                 </p>
               </div>
             </div>

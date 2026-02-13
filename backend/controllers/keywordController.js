@@ -34,9 +34,10 @@ exports.getKeywordsByService = async (req, res, next) => {
     });
     
     if (!keywordDoc) {
-      return res.status(404).json({
-        success: false,
-        message: `No keywords found for pattern: ${servicePattern}`
+      return res.json({
+        success: true,
+        data: { keywords: [], servicePattern },
+        message: `No keywords configured for: ${servicePattern}. Add via admin panel.`
       });
     }
     
@@ -127,7 +128,7 @@ exports.getKeywordSuggestions = async (req, res, next) => {
       });
     }
     
-    const keywords = await ServiceKeywords.getKeywordsForService(serviceType);
+    const keywords = await ServiceKeywords.getKeywordsForService(serviceType) || [];
     
     res.json({
       success: true,

@@ -27,6 +27,7 @@ const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const dynamicRoutes = require('./routes/dynamicRoutes');
 const taxonomyRoutes = require('./routes/taxonomyRoutes');
+const vendorProfileRoutes = require('./routes/vendorProfileRoutes');
 
 // Use Routes
 app.use('/api/services', serviceRoutes);
@@ -37,6 +38,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/dynamic', dynamicRoutes); // Dynamic data endpoints
 app.use('/api/taxonomy', taxonomyRoutes); // Master taxonomy system
+app.use('/api/vendor-profile', vendorProfileRoutes); // Vendor profile management
 
 // Detect service intent endpoint (special case - not under /services)
 const { detectServiceIntent } = require('./controllers/serviceController');
@@ -122,6 +124,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✅ All routes loaded successfully`);
 });
 
 module.exports = app;

@@ -13,6 +13,7 @@ const {
 } = require('../controllers/vendorControllerNew');
 const { googleLoginVendor } = require('../controllers/googleAuthController');
 const inquiryController = require('../controllers/inquiryController');
+const paymentController = require('../controllers/paymentController');
 const { protect } = require('../middleware/authMiddleware');
 
 // Public Routes
@@ -21,6 +22,50 @@ const { protect } = require('../middleware/authMiddleware');
 // @desc    Register a new vendor
 // @access  Public
 router.post('/register', registerVendor);
+
+// Payment Routes
+
+// @route   POST /api/vendors/create-payment-order
+// @desc    Create payment order for plan subscription
+// @access  Public
+router.post('/create-payment-order', paymentController.createPaymentOrder);
+
+// @route   POST /api/vendors/verify-payment
+// @desc    Verify payment and activate plan
+// @access  Public
+router.post('/verify-payment', paymentController.verifyPayment);
+
+// @route   GET /api/vendors/payment-status/:orderId
+// @desc    Get payment order status
+// @access  Public
+router.get('/payment-status/:orderId', paymentController.getPaymentStatus);
+
+// Subscription & Payment Management Routes (Protected)
+
+// @route   GET /api/vendors/my-subscription
+// @desc    Get current vendor subscription details
+// @access  Private (Vendor)
+router.get('/my-subscription', protect, paymentController.getMySubscription);
+
+// @route   GET /api/vendors/payment-history
+// @desc    Get vendor's payment history
+// @access  Private (Vendor)
+router.get('/payment-history', protect, paymentController.getPaymentHistory);
+
+// @route   GET /api/vendors/payment-receipt/:paymentId
+// @desc    Generate payment receipt
+// @access  Private (Vendor)
+router.get('/payment-receipt/:paymentId', protect, paymentController.getPaymentReceipt);
+
+// @route   POST /api/vendors/retry-payment/:orderId
+// @desc    Retry a failed payment
+// @access  Private (Vendor)
+router.post('/retry-payment/:orderId', protect, paymentController.retryPayment);
+
+// @route   POST /api/vendors/upgrade-plan
+// @desc    Create payment order for plan upgrade
+// @access  Private (Vendor)
+router.post('/upgrade-plan', protect, paymentController.createUpgradeOrder);
 
 // @route   POST /api/vendors/login
 // @desc    Login vendor

@@ -6,127 +6,99 @@ const PlansPage = () => {
   const [billingCycle, setBillingCycle] = useState('monthly');
   const navigate = useNavigate();
 
+  // Plans array (ids preserved where routing depends on them)
   const plans = [
     {
       id: 'free',
-      name: 'Free Listing',
-      tagline: 'Perfect to get started',
+      name: 'Free Plan — Unlisted Vendor',
+      tagline: 'Entry-level presence — organic discovery',
       icon: Users,
       iconColor: 'text-gray-600',
       bgGradient: 'from-gray-50 to-gray-100',
       borderColor: 'border-gray-200',
-      price: {
-        monthly: 0,
-        yearly: 0
-      },
+      price: { monthly: 0, yearly: 0 },
       popular: false,
       features: [
-        { text: 'Basic business listing', included: true },
-        { text: 'Up to 3 service categories', included: true },
-        { text: 'Basic contact information', included: true },
-        { text: '5 images gallery', included: true },
-        { text: 'Search visibility', included: true },
-        { text: 'Mobile responsive profile', included: true },
-        { text: 'Priority support', included: false },
-        { text: 'Featured placement', included: false },
-        { text: 'Advanced analytics', included: false },
-        { text: 'Lead notifications', included: false },
+        { text: 'Platform registration', included: true },
+        { text: 'Service & city listing', included: true },
+        { text: 'Portfolio showcase: Up to 5 images', included: true },
+        { text: 'Appears in general search results', included: true },
+        { text: 'Discoverable via category & location', included: true },
         { text: 'Verified badge', included: false },
-        { text: 'Custom branding', included: false }
+        { text: 'Priority visibility', included: false },
+        { text: 'Marketing push', included: false }
       ],
-      cta: 'Get Started Free',
-      description: 'Basic presence for vendors starting out'
+      cta: 'Get Started',
+      description: 'Entry-level platform presence with organic discovery.'
     },
     {
       id: 'basic',
-      name: 'Basic',
-      tagline: 'Grow your business',
+      name: 'Starter',
+      tagline: 'Verified visibility — entry level',
       icon: Zap,
       iconColor: 'text-blue-600',
       bgGradient: 'from-blue-50 to-indigo-50',
       borderColor: 'border-blue-200',
-      price: {
-        monthly: 999,
-        yearly: 9990
-      },
+      price: { monthly: 499, yearly: 4990 },
       popular: false,
+      trialDays: 30,
       features: [
-        { text: 'Everything in Free, plus:', included: true, highlight: true },
-        { text: 'Unlimited service categories', included: true },
-        { text: '20 images gallery', included: true },
-        { text: 'Video showcase', included: true },
-        { text: 'Email lead notifications', included: true },
-        { text: 'Basic analytics dashboard', included: true },
-        { text: 'Customer reviews display', included: true },
-        { text: 'Social media links', included: true },
-        { text: 'Priority support', included: false },
-        { text: 'Featured placement', included: false },
-        { text: 'Verified badge', included: false },
-        { text: 'Custom branding', included: false }
+        { text: 'First 30 days free trial', included: true, highlight: true },
+        { text: 'Verified vendor badge', included: true },
+        { text: 'Portfolio showcase: Up to 15 images / videos', included: true },
+        { text: 'Improved placement in search results', included: true },
+        { text: 'Category + location SEO optimization', included: true },
+        { text: 'Profile reviewed & managed by AIS team', included: true }
       ],
-      cta: 'Start Basic Plan',
-      description: 'Enhanced visibility and engagement'
+      cta: 'Start Starter Plan',
+      description: 'Enhanced credibility and improved discoverability. Try free for 30 days.'
     },
     {
       id: 'professional',
-      name: 'Professional',
-      tagline: 'Most popular choice',
+      name: 'Growth',
+      tagline: 'High visibility vendor',
       icon: Star,
       iconColor: 'text-purple-600',
       bgGradient: 'from-purple-50 to-pink-50',
       borderColor: 'border-purple-300',
-      price: {
-        monthly: 2499,
-        yearly: 24990
-      },
+      price: { monthly: 999, yearly: 9990 },
       popular: true,
+      trialDays: 30,
       features: [
-        { text: 'Everything in Basic, plus:', included: true, highlight: true },
-        { text: 'Verified vendor badge', included: true },
-        { text: 'Featured in search results', included: true },
-        { text: 'Unlimited image gallery', included: true },
-        { text: 'Multiple videos showcase', included: true },
-        { text: 'Advanced analytics & insights', included: true },
-        { text: 'Real-time lead notifications (SMS + Email)', included: true },
-        { text: 'Priority customer support', included: true },
-        { text: 'Featured on homepage', included: true },
-        { text: 'Custom URL slug', included: true },
-        { text: 'Social proof widgets', included: true },
-        { text: 'Dedicated account manager', included: false }
+        { text: 'First 30 days free trial', included: true, highlight: true },
+        { text: 'Portfolio showcase: Up to 30 images / videos', included: true },
+        { text: 'Everything in Starter', included: true },
+        { text: 'Higher ranking in category searches', included: true },
+        { text: 'Featured placement in recommended vendors', included: true },
+        { text: 'Portfolio enhancement', included: true },
+        { text: 'Basic social media promotion', included: true }
       ],
-      cta: 'Go Professional',
-      description: 'Maximum leads and visibility',
+      cta: 'Start Growth Plan',
+      description: 'Designed to increase discovery and inbound inquiries. Try free for 30 days.',
       badge: 'MOST POPULAR'
     },
     {
       id: 'enterprise',
-      name: 'Enterprise',
-      tagline: 'For established brands',
+      name: 'Premium',
+      tagline: 'Maximum visibility & brand push',
       icon: Crown,
       iconColor: 'text-amber-600',
       bgGradient: 'from-amber-50 to-orange-50',
       borderColor: 'border-amber-300',
-      price: {
-        monthly: 4999,
-        yearly: 49990
-      },
+      price: { monthly: 1499, yearly: 14990 },
       popular: false,
+      trialDays: 30,
       features: [
-        { text: 'Everything in Professional, plus:', included: true, highlight: true },
+        { text: 'First 30 days free trial', included: true, highlight: true },
+        { text: 'Unlimited portfolio showcase (images & videos)', included: true },
+        { text: 'Top-tier visibility in search results', included: true },
         { text: 'Premium verified badge', included: true },
-        { text: 'Top position in search', included: true },
-        { text: 'Multi-location support', included: true },
-        { text: 'White-label profile', included: true },
-        { text: 'API access for integrations', included: true },
-        { text: 'Dedicated account manager', included: true },
-        { text: 'Custom landing pages', included: true },
-        { text: 'Priority listing in all cities', included: true },
-        { text: 'Exclusive promotional campaigns', included: true },
-        { text: 'Advanced competitor insights', included: true },
-        { text: 'Custom reporting & BI tools', included: true }
+        { text: 'Social media shoutouts & promotions', included: true },
+        { text: 'Dedicated profile optimization', included: true },
+        { text: 'Priority placement during high-demand searches', included: true }
       ],
       cta: 'Contact Sales',
-      description: 'Enterprise-grade solutions',
+      description: 'For vendors seeking strong brand presence and maximum reach. Try free for 30 days.',
       badge: 'PREMIUM'
     }
   ];
@@ -137,7 +109,6 @@ const PlansPage = () => {
     } else if (planId === 'enterprise') {
       navigate('/contact?subject=enterprise-plan');
     } else {
-      // Navigate to payment/subscription page
       navigate(`/subscribe/${planId}?billing=${billingCycle}`);
     }
   };
@@ -155,14 +126,15 @@ const PlansPage = () => {
         <div className="max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-6">
             <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium">Trusted by 10,000+ vendors</span>
+            <span className="text-sm font-medium">AIS — Vendor Visibility Plans</span>
           </div>
-          
+
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
-            Choose Your Perfect Plan
+            Vendor Visibility Plans — Search Engine Discovery Model
           </h1>
+
           <p className="text-xl md:text-2xl text-indigo-100 mb-8 max-w-3xl mx-auto">
-            Grow your event services business with our powerful platform
+            AIS operates like a search engine for events. Vendor visibility, ranking, and discovery improve based on plan selection and profile optimization. We enable genuine discovery — we do not guarantee leads.
           </p>
 
           {/* Billing Toggle */}
@@ -170,9 +142,7 @@ const PlansPage = () => {
             <button
               onClick={() => setBillingCycle('monthly')}
               className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
-                billingCycle === 'monthly'
-                  ? 'bg-white text-indigo-600 shadow-lg'
-                  : 'text-white hover:text-indigo-100'
+                billingCycle === 'monthly' ? 'bg-white text-indigo-600 shadow-lg' : 'text-white hover:text-indigo-100'
               }`}
             >
               Monthly
@@ -180,15 +150,11 @@ const PlansPage = () => {
             <button
               onClick={() => setBillingCycle('yearly')}
               className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
-                billingCycle === 'yearly'
-                  ? 'bg-white text-indigo-600 shadow-lg'
-                  : 'text-white hover:text-indigo-100'
+                billingCycle === 'yearly' ? 'bg-white text-indigo-600 shadow-lg' : 'text-white hover:text-indigo-100'
               }`}
             >
               Yearly
-              <span className="ml-2 text-xs bg-green-400 text-green-900 px-2 py-0.5 rounded-full">
-                Save 16%
-              </span>
+              <span className="ml-2 text-xs bg-green-400 text-green-900 px-2 py-0.5 rounded-full">Save 16%</span>
             </button>
           </div>
         </div>
@@ -208,9 +174,7 @@ const PlansPage = () => {
               >
                 {/* Popular Badge */}
                 {plan.badge && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-4 py-1 rounded-bl-lg">
-                    {plan.badge}
-                  </div>
+                  <div className="absolute top-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-4 py-1 rounded-bl-lg">{plan.badge}</div>
                 )}
 
                 {/* Plan Header */}
@@ -220,21 +184,21 @@ const PlansPage = () => {
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-1">{plan.name}</h3>
                   <p className="text-sm text-gray-600 mb-4">{plan.tagline}</p>
-                  
+
                   {/* Price */}
                   <div className="mb-4">
                     <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-bold text-gray-900">
-                        {getPriceDisplay(plan.price[billingCycle])}
-                      </span>
-                      {plan.price.monthly > 0 && (
-                        <span className="text-gray-600 text-sm">/month</span>
-                      )}
+                      <span className="text-4xl font-bold text-gray-900">{getPriceDisplay(plan.price[billingCycle])}</span>
+                      {plan.price.monthly > 0 && <span className="text-gray-600 text-sm">/month</span>}
                     </div>
                     {billingCycle === 'yearly' && plan.price.yearly > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Billed ₹{plan.price.yearly.toLocaleString('en-IN')} annually
-                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Billed ₹{plan.price.yearly.toLocaleString('en-IN')} annually</p>
+                    )}
+                    {plan.trialDays && (
+                      <div className="mt-2 inline-flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                        <Sparkles className="w-3 h-3" />
+                        <span>{plan.trialDays} Days Free</span>
+                      </div>
                     )}
                   </div>
 
@@ -247,17 +211,11 @@ const PlansPage = () => {
                     {plan.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start gap-3">
                         {feature.included ? (
-                          <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
-                            feature.highlight ? 'text-purple-600' : 'text-green-600'
-                          }`} />
+                          <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${feature.highlight ? 'text-purple-600' : 'text-green-600'}`} />
                         ) : (
                           <X className="w-5 h-5 text-gray-300 flex-shrink-0 mt-0.5" />
                         )}
-                        <span className={`text-sm ${
-                          feature.included ? 'text-gray-700' : 'text-gray-400'
-                        } ${feature.highlight ? 'font-semibold text-purple-700' : ''}`}>
-                          {feature.text}
-                        </span>
+                        <span className={`text-sm ${feature.included ? 'text-gray-700' : 'text-gray-400'} ${feature.highlight ? 'font-semibold text-purple-700' : ''}`}>{feature.text}</span>
                       </li>
                     ))}
                   </ul>
@@ -282,15 +240,26 @@ const PlansPage = () => {
         </div>
       </div>
 
+      {/* Important Notes - Discovery Model */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-indigo-600">
+          <h3 className="text-lg font-bold mb-2">Important — How AIS Discovery Works</h3>
+          <ul className="list-disc pl-5 text-sm text-gray-700 space-y-2">
+            <li>Vendor contact numbers are not displayed publicly; all inquiries are routed through the AIS platform.</li>
+            <li>Lead volume is not guaranteed — AIS enables genuine discovery and improves visibility based on plan level and profile optimization.</li>
+            <li>AIS does not sell fake leads or promise guaranteed inquiries.</li>
+            <li>Visibility and ranking depend on plan selection and quality of profile optimization.</li>
+            <li><strong>Free Trial:</strong> All paid plans include a 30-day free trial. No payment charged during trial. Vendors can upgrade, downgrade, or cancel anytime.</li>
+            <li><strong>Portfolio Limits:</strong> Each plan has specific portfolio limits per vendor profile. File type support for images and videos varies by plan tier.</li>
+          </ul>
+        </div>
+      </div>
+
       {/* Comparison Table Section */}
       <div className="max-w-7xl mx-auto px-4 py-16">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Compare All Features
-          </h2>
-          <p className="text-lg text-gray-600">
-            Find the perfect plan for your business needs
-          </p>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Compare All Features</h2>
+          <p className="text-lg text-gray-600">Find the perfect plan for your business needs</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
@@ -300,9 +269,7 @@ const PlansPage = () => {
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Feature</th>
                   {plans.map(plan => (
-                    <th key={plan.id} className="px-6 py-4 text-center text-sm font-semibold text-gray-900">
-                      {plan.name}
-                    </th>
+                    <th key={plan.id} className="px-6 py-4 text-center text-sm font-semibold text-gray-900">{plan.name}</th>
                   ))}
                 </tr>
               </thead>
@@ -322,9 +289,7 @@ const PlansPage = () => {
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-700 font-medium">{feature}</td>
                     {plans.map(plan => {
-                      const hasFeature = plan.features.find(f => 
-                        f.text.toLowerCase().includes(feature.toLowerCase().split(' ')[0])
-                      );
+                      const hasFeature = plan.features.find(f => f.text.toLowerCase().includes(feature.toLowerCase().split(' ')[0]));
                       return (
                         <td key={plan.id} className="px-6 py-4 text-center">
                           {hasFeature?.included ? (
@@ -351,29 +316,23 @@ const PlansPage = () => {
               <Shield className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Secure & Trusted</h3>
-            <p className="text-gray-600">
-              Industry-standard security with SSL encryption and data protection
-            </p>
+            <p className="text-gray-600">Industry-standard security with SSL encryption and data protection</p>
           </div>
-          
+
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 text-white mb-4">
               <TrendingUp className="w-8 h-8" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Proven Results</h3>
-            <p className="text-gray-600">
-              Our vendors see 3x more inquiries within the first month
-            </p>
+            <p className="text-gray-600">Our vendors see improved discovery and platform exposure</p>
           </div>
-          
+
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white mb-4">
               <Users className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">24/7 Support</h3>
-            <p className="text-gray-600">
-              Dedicated support team ready to help you succeed
-            </p>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Support</h3>
+            <p className="text-gray-600">Dedicated support to help optimize your profile and visibility</p>
           </div>
         </div>
       </div>
@@ -381,27 +340,29 @@ const PlansPage = () => {
       {/* FAQ Section */}
       <div className="bg-gradient-to-br from-gray-50 to-blue-50 py-16">
         <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-12">
-            Frequently Asked Questions
-          </h2>
-          
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-12">Frequently Asked Questions</h2>
+
           <div className="space-y-6">
             {[
               {
+                q: 'What is the 30-day free trial?',
+                a: "All paid plans (Starter, Growth, and Premium) include a 30-day free trial. You won't be charged during the trial period, and you can upgrade, downgrade, or cancel anytime without any obligation."
+              },
+              {
+                q: 'What are the portfolio limits for each plan?',
+                a: "Free Plan: Up to 5 images | Starter Plan: Up to 15 images/videos | Growth Plan: Up to 30 images/videos | Premium Plan: Unlimited images and videos. Portfolio limits apply per vendor profile."
+              },
+              {
                 q: 'Can I upgrade or downgrade my plan anytime?',
-                a: 'Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we\'ll prorate the difference.'
+                a: "Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate the difference."
               },
               {
                 q: 'Is there a contract or can I cancel anytime?',
-                a: 'No contracts required! You can cancel your subscription anytime. Your plan remains active until the end of your billing period.'
+                a: "No contracts required! You can cancel your subscription anytime. Your plan remains active until the end of your billing period."
               },
               {
                 q: 'What payment methods do you accept?',
-                a: 'We accept all major credit/debit cards, UPI, net banking, and digital wallets. All payments are processed securely.'
-              },
-              {
-                q: 'Do you offer refunds?',
-                a: 'Yes, we offer a 7-day money-back guarantee if you\'re not satisfied with our service.'
+                a: "We accept all major credit/debit cards, UPI, net banking, and digital wallets. All payments are processed securely."
               }
             ].map((faq, idx) => (
               <div key={idx} className="bg-white rounded-xl shadow-md p-6">
@@ -416,18 +377,9 @@ const PlansPage = () => {
       {/* Final CTA */}
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-16">
         <div className="max-w-4xl mx-auto text-center px-4">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Grow Your Business?
-          </h2>
-          <p className="text-xl text-indigo-100 mb-8">
-            Join thousands of successful vendors on our platform
-          </p>
-          <button
-            onClick={() => navigate('/vendor-registration')}
-            className="bg-white text-indigo-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1"
-          >
-            Get Started Now
-          </button>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Grow Your Business?</h2>
+          <p className="text-xl text-indigo-100 mb-8">Join successful vendors on our platform to improve discovery and reach</p>
+          <button onClick={() => navigate('/vendor-registration')} className="bg-white text-indigo-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1">Get Started Now</button>
         </div>
       </div>
     </div>

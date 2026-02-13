@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, MapPin, Sparkles, TrendingUp, Package, List } from 'lucide-react';
 import { ServiceProvider, useService } from '../contexts/ServiceContext';
 import DynamicFilterPanel from '../components/DynamicFilterPanel';
+import LocationFilters from '../components/LocationFilters';
 import VendorCard from '../components/VendorCard';
 import SolutionCard from '../components/SolutionCard';
 import { getSuggestedServices } from '../services/filterService';
@@ -202,12 +203,20 @@ const DynamicSearchPageContent = () => {
                   </div>
                 </div>
               ) : (
-                <DynamicFilterPanel 
-                  filterSchema={filterSchema}
-                  appliedFilters={appliedFilters}
-                  onFilterChange={setFilter}
-                  onClearAll={clearAllFilters}
-                />
+                <div>
+                  <LocationFilters onChange={({ city, area }) => {
+                    // Update context filters when user selects city/area
+                    setFilter('city', city || undefined);
+                    setFilter('area', area || undefined);
+                  }} />
+
+                  <DynamicFilterPanel 
+                    filterSchema={filterSchema}
+                    appliedFilters={appliedFilters}
+                    onFilterChange={setFilter}
+                    onClearAll={clearAllFilters}
+                  />
+                </div>
               )}
             </div>
           </div>

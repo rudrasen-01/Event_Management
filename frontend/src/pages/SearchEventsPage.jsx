@@ -488,7 +488,10 @@ const SearchEventsPage = () => {
                           className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                         >
                           <div className="text-sm font-medium text-gray-900">{city.name}</div>
-                          <div className="text-xs text-gray-500">{city.state} {city.count && `(${city.count})`}</div>
+                          <div className="text-xs text-gray-500">
+                            {city.state}
+                            {city.count > 0 && <span className="ml-1 text-blue-600 font-medium">• {city.count} vendors</span>}
+                          </div>
                         </button>
                       ))}
                   </div>

@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle, Search, MapPin, Phone, Mail, Camera, Clock, 
   ChevronRight, ChevronLeft, Home, Building2, User, IndianRupee,
-  Calendar, Shield, Check, AlertCircle
+  Calendar, Shield, Check, AlertCircle, Zap, TrendingUp, Star,
+  Award, Eye, Sparkles, Crown, CreditCard, Smartphone, Wallet,
+  Building, Lock, ArrowRight, Info
 } from 'lucide-react';
 import { getAllServices } from '../services/taxonomyService';
 import { fetchCities } from '../services/dynamicDataService';
@@ -19,6 +21,14 @@ const VendorRegistrationMultiStep = () => {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [showManualCategory, setShowManualCategory] = useState(false);
+  
+  // Payment gateway state management
+  const [paymentState, setPaymentState] = useState('idle'); // idle | initiating | processing | verifying | success | failed | cancelled
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentOrderId, setPaymentOrderId] = useState('');
+  const [paymentId, setPaymentId] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(''); // upi | card | netbanking | wallet
   
   // Single Source of Truth - Data fetched from backend
   const [vendorServices, setVendorServices] = useState([]);
@@ -26,10 +36,85 @@ const VendorRegistrationMultiStep = () => {
   const [servicesLoading, setServicesLoading] = useState(true);
   const [citiesLoading, setCitiesLoading] = useState(true);
 
-  const totalSteps = 6;
+  const totalSteps = 7;
+
+  // Visibility Plans - Scalable data structure
+  const visibilityPlans = [
+    {
+      id: 'free',
+      name: 'Free',
+      price: 0,
+      duration: 'Forever',
+      popular: false,
+      icon: Home,
+      color: 'gray',
+      features: [
+        'Basic listing',
+        'Up to 5 portfolio images',
+        'Standard search visibility',
+        'Customer inquiries enabled'
+      ],
+      limitations: ['No featured placement', 'No verified badge', 'Limited visibility']
+    },
+    {
+      id: 'starter',
+      name: 'Starter',
+      price: 999,
+      duration: 'per month',
+      popular: false,
+      icon: Zap,
+      color: 'blue',
+      features: [
+        'Verified badge',
+        'Up to 15 images/videos',
+        'Higher search ranking',
+        'Blog posts enabled',
+        'Priority customer support'
+      ],
+      limitations: []
+    },
+    {
+      id: 'growth',
+      name: 'Growth',
+      price: 2499,
+      duration: 'per month',
+      popular: true,
+      icon: TrendingUp,
+      color: 'indigo',
+      features: [
+        'Featured placement',
+        'Up to 30 images/videos',
+        'Top search priority',
+        'Unlimited blog posts',
+        'Advanced analytics',
+        'Social media promotion'
+      ],
+      limitations: []
+    },
+    {
+      id: 'premium',
+      name: 'Premium',
+      price: 4999,
+      duration: 'per month',
+      popular: false,
+      icon: Crown,
+      color: 'amber',
+      features: [
+        'Premium badge',
+        'Unlimited portfolio',
+        'Maximum visibility',
+        'Featured on homepage',
+        'Dedicated account manager',
+        'Custom branding options',
+        'Priority in all categories'
+      ],
+      limitations: []
+    }
+  ];
 
   const [formData, setFormData] = useState({
     serviceType: '',
+    customService: '',
     businessName: '',
     pincode: '',
     plotNo: '',
@@ -49,6 +134,11 @@ const VendorRegistrationMultiStep = () => {
     password: '',
     confirmPassword: '',
     photos: [],
+    // Visibility plan selection
+    selectedPlan: 'free',
+    planPrice: 0,
+    planDuration: 'Forever',
+    // Service pricing (separate from platform plan)
     minPrice: '',
     maxPrice: '',
     priceUnit: 'per event',
@@ -82,9 +172,14 @@ const VendorRegistrationMultiStep = () => {
         
         // Fetch cities from dynamic API
         const citiesData = await fetchCities();
-        setCities(citiesData);
+        console.log('🏙️ Vendor Registration - Cities loaded:', {
+          total: citiesData?.length || 0,
+          sample: citiesData?.slice(0, 3),
+          isArray: Array.isArray(citiesData)
+        });
+        setCities(Array.isArray(citiesData) ? citiesData : []);
       } catch (err) {
-        console.error('Failed to load data:', err);
+        console.error('❌ Failed to load data:', err);
         setError('Failed to load registration data. Please refresh the page.');
       } finally {
         setServicesLoading(false);
@@ -117,7 +212,7 @@ const VendorRegistrationMultiStep = () => {
   const validateStep = (step) => {
     switch (step) {
       case 1:
-        if (!formData.serviceType) return 'Please select a business category';
+        if (!formData.serviceType && !formData.customService.trim()) return 'Please select or enter a business category';
         break;
       case 2:
         if (!formData.businessName.trim()) return 'Business name is required';
@@ -146,6 +241,10 @@ const VendorRegistrationMultiStep = () => {
       case 5:
         break;
       case 6:
+        // Plan selection validation - Free plan is always valid
+        if (!formData.selectedPlan) return 'Please select a visibility plan';
+        break;
+      case 7:
         if (!formData.minPrice || !formData.maxPrice) return 'Enter your pricing range';
         if (Number(formData.minPrice) >= Number(formData.maxPrice)) return 'Max price must be greater than min';
         if (Number(formData.minPrice) < 100) return 'Minimum price seems too low';
@@ -240,7 +339,7 @@ const VendorRegistrationMultiStep = () => {
       const payload = {
         name: formData.contactPerson.trim(),
         businessName: formData.businessName.trim(),
-        serviceType: formData.serviceType,
+      serviceType: formData.serviceType || formData.customService.trim(),
         location: {
           type: 'Point',
           coordinates: [lng, lat]
@@ -313,6 +412,112 @@ const VendorRegistrationMultiStep = () => {
     navigate('/vendor-dashboard');
   };
 
+  // Payment Gateway Handlers
+  const handlePaymentMethodSelect = (method) => {
+    setSelectedPaymentMethod(method);
+  };
+
+  const handlePayNow = async () => {
+    if (!selectedPaymentMethod) {
+      setPaymentError('Please select a payment method');
+      return;
+    }
+
+    setPaymentState('initiating');
+    setPaymentError('');
+
+    try {
+      // Step 1: Create payment order on backend
+      const totalAmount = formData.planPrice + Math.round(formData.planPrice * 0.18);
+      
+      const orderResponse = await fetch('http://localhost:5000/api/vendors/create-payment-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: totalAmount,
+          planId: formData.selectedPlan,
+          planName: visibilityPlans.find(p => p.id === formData.selectedPlan)?.name,
+          vendorEmail: formData.email,
+          vendorName: formData.businessName,
+          paymentMethod: selectedPaymentMethod
+        })
+      });
+
+      const orderData = await orderResponse.json();
+
+      if (!orderResponse.ok) {
+        throw new Error(orderData.message || 'Failed to create payment order');
+      }
+
+      setPaymentOrderId(orderData.orderId);
+
+      // Step 2: Simulate payment processing (In production, integrate with Razorpay SDK)
+      setPaymentState('processing');
+
+      // Simulate payment gateway delay (2-3 seconds like real payment gateways)
+      await new Promise(resolve => setTimeout(resolve, 2500));
+
+      // Step 3: Simulate payment success (90% success rate for demo)
+      const isSuccess = Math.random() > 0.1; // 90% success rate
+
+      if (isSuccess) {
+        // Generate mock payment ID
+        const mockPaymentId = `pay_${Date.now()}${Math.random().toString(36).substr(2, 9)}`;
+        setPaymentId(mockPaymentId);
+
+        // Verify payment on backend
+        setPaymentState('verifying');
+
+        const verifyResponse = await fetch('http://localhost:5000/api/vendors/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderData.orderId,
+            paymentId: mockPaymentId,
+            signature: 'mock_signature_' + mockPaymentId
+          })
+        });
+
+        const verifyData = await verifyResponse.json();
+
+        if (!verifyResponse.ok) {
+          throw new Error(verifyData.message || 'Payment verification failed');
+        }
+
+        // Payment successful!
+        setPaymentState('success');
+
+      } else {
+        // Simulate payment failure
+        throw new Error('Payment declined by bank. Please try again or use a different payment method.');
+      }
+
+    } catch (err) {
+      console.error('💳 Payment error:', err);
+      setPaymentError(err.message || 'Payment processing failed');
+      setPaymentState('failed');
+    }
+  };
+
+  const handlePaymentRetry = () => {
+    setPaymentState('idle');
+    setPaymentError('');
+    setSelectedPaymentMethod('');
+  };
+
+  const handlePaymentSuccess = () => {
+    // After successful payment, proceed to submit registration
+    setPaymentState('idle');
+    handleSubmit();
+  };
+
+  const handlePayLater = () => {
+    // User wants to pay later - register with free plan for now
+    handleChange('selectedPlan', 'free');
+    handleChange('planPrice', 0);
+    handleChange('planDuration', 'Forever');
+  };
+
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   if (success) {
@@ -359,7 +564,7 @@ const VendorRegistrationMultiStep = () => {
       <div className="bg-white border-b">
         <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-4">
-            {[1, 2, 3, 4, 5, 6].map((step, index) => (
+            {[1, 2, 3, 4, 5, 6, 7].map((step, index) => (
               <React.Fragment key={step}>
                 <div className="flex flex-col items-center">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold
@@ -375,9 +580,10 @@ const VendorRegistrationMultiStep = () => {
                     {step === 4 && 'Contact'}
                     {step === 5 && 'Photos'}
                     {step === 6 && 'Pricing'}
+                    {step === 7 && 'Plans'}
                   </span>
                 </div>
-                {index < 5 && (
+                {index < 6 && (
                   <div className={`flex-1 h-0.5 mx-2 ${currentStep > step + 1 ? 'bg-green-600' : 'bg-gray-200'}`} />
                 )}
               </React.Fragment>
@@ -482,11 +688,11 @@ const VendorRegistrationMultiStep = () => {
                     </div>
 
                     {/* Selected Category Display */}
-                    {formData.serviceType && !showCategoryDropdown && (
+                    {(formData.serviceType || formData.customService) && (
                       <div className="mt-3 bg-green-50 border border-green-200 rounded p-3 flex items-center gap-2">
                         <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
                         <span className="text-sm text-green-800 font-medium">
-                          Selected: {vendorServices.find(s => s.value === formData.serviceType)?.label}
+                          Selected: {formData.serviceType ? (vendorServices.find(s => s.value === formData.serviceType)?.label) : formData.customService}
                         </span>
                       </div>
                     )}
@@ -496,8 +702,31 @@ const VendorRegistrationMultiStep = () => {
                 {/* Browse by Category - Show when search is empty */}
                 {!categorySearch && !servicesLoading && (
                   <div className="mt-6">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-4">Browse by Category</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-4">Browse by category or type your category manually below</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowManualCategory(prev => !prev)}
+                        className="text-xs text-indigo-600 hover:underline"
+                      >
+                        {showManualCategory ? 'Choose from list' : "Can't find your category? Enter manually"}
+                      </button>
+                    </div>
+
+                    {showManualCategory && (
+                      <div className="mb-4">
+                        <label className="text-xs text-gray-600 mb-1 block">Enter your service / business category</label>
+                        <input
+                          type="text"
+                          value={formData.customService}
+                          onChange={(e) => handleChange('customService', e.target.value)}
+                          placeholder="e.g. Luxury Wedding Rentals"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                        />
+                      </div>
+                    )}
                     <div className="space-y-3">
+                      {/** When manual input is active we still show list below if user wants to pick */}
                       {[
                         'Venues',
                         'Event Planning',
@@ -586,11 +815,33 @@ const VendorRegistrationMultiStep = () => {
                       className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
                                focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="">{citiesLoading ? 'Loading cities...' : 'Select City'}</option>
-                      {cities.map((city) => (
-                        <option key={city.name} value={city.name}>{city.name}</option>
-                      ))}
+                      <option value="">
+                        {citiesLoading 
+                          ? 'Loading cities...' 
+                          : cities.length > 0 
+                            ? 'Select City' 
+                            : 'No cities available'}
+                      </option>
+                      {cities && cities.length > 0 ? (
+                        cities.map((city, index) => (
+                          <option key={city.name || index} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))
+                      ) : (
+                        !citiesLoading && <option value="" disabled>No cities found</option>
+                      )}
                     </select>
+                    {!citiesLoading && cities.length === 0 && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ⚠️ No cities loaded. Please refresh the page.
+                      </p>
+                    )}
+                    {cities.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {cities.length} cities available
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -854,84 +1105,744 @@ const VendorRegistrationMultiStep = () => {
               </div>
             )}
 
-            {/* Step 6: Pricing */}
+            {/* Step 6: Service Pricing */}
             {currentStep === 6 && (
               <div className="space-y-6">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900 mb-1">Pricing Details</h2>
-                  <p className="text-sm text-gray-600">Set your service pricing range</p>
+                {/* Header with Clear Separation */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <IndianRupee className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900 mb-1">Set Your Service Pricing</h2>
+                      <p className="text-sm text-gray-700">
+                        Define your service charges that customers will see
+                      </p>
+                      <p className="text-xs text-blue-700 mt-1 font-medium">
+                        💡 Note: This is your service pricing, not the platform subscription fee
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Minimum Price <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.minPrice}
-                        onChange={(e) => handleChange('minPrice', e.target.value)}
-                        placeholder="10000"
-                        className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded text-sm
-                                 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      />
+                {/* Pricing Range Section */}
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm">
+                      1
+                    </span>
+                    Set your service pricing range
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* Minimum Price */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Minimum Price <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg flex items-center justify-center group-focus-within:border-indigo-500 group-focus-within:bg-indigo-50 transition-colors">
+                          <IndianRupee className="w-5 h-5 text-gray-500 group-focus-within:text-indigo-600" />
+                        </div>
+                        <input
+                          type="number"
+                          value={formData.minPrice}
+                          onChange={(e) => handleChange('minPrice', e.target.value)}
+                          placeholder="10000"
+                          min="0"
+                          step="1000"
+                          className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg text-base font-medium
+                                   focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                                   transition-all"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1.5">Starting price for your services</p>
+                    </div>
+
+                    {/* Maximum Price */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Maximum Price <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg flex items-center justify-center group-focus-within:border-indigo-500 group-focus-within:bg-indigo-50 transition-colors">
+                          <IndianRupee className="w-5 h-5 text-gray-500 group-focus-within:text-indigo-600" />
+                        </div>
+                        <input
+                          type="number"
+                          value={formData.maxPrice}
+                          onChange={(e) => handleChange('maxPrice', e.target.value)}
+                          placeholder="50000"
+                          min="0"
+                          step="1000"
+                          className="w-full pl-14 pr-4 py-3 border border-gray-300 rounded-lg text-base font-medium
+                                   focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                                   transition-all"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1.5">Maximum price for premium services</p>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Maximum Price <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="number"
-                        value={formData.maxPrice}
-                        onChange={(e) => handleChange('maxPrice', e.target.value)}
-                        placeholder="50000"
-                        className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded text-sm
-                                 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      />
+                  {/* Price Preview */}
+                  {formData.minPrice && formData.maxPrice && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        <span className="font-semibold">Your pricing range:</span> ₹{formData.minPrice?.toLocaleString()} - ₹{formData.maxPrice?.toLocaleString()}
+                      </p>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price Unit
+                {/* Price Unit Section */}
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm">
+                      2
+                    </span>
+                    Price Unit
+                  </h3>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      How do you charge for your services?
                     </label>
                     <select
                       value={formData.priceUnit}
                       onChange={(e) => handleChange('priceUnit', e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base font-medium
+                               focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                               bg-white cursor-pointer transition-all"
                     >
                       <option value="per event">Per Event</option>
                       <option value="per day">Per Day</option>
                       <option value="per hour">Per Hour</option>
                       <option value="per plate">Per Plate</option>
                       <option value="per person">Per Person</option>
+                      <option value="per sqft">Per Square Feet</option>
+                      <option value="per package">Per Package</option>
                     </select>
+                    <p className="text-xs text-gray-500 mt-1.5">Select how you typically charge customers</p>
                   </div>
+                </div>
 
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Business Description (Optional)
+                {/* Business Description Section */}
+                <div className="bg-white border border-gray-200 rounded-xl p-6">
+                  <h3 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm">
+                      3
+                    </span>
+                    Business Description (Optional)
+                  </h3>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tell customers about your business
                     </label>
                     <textarea
                       value={formData.description}
                       onChange={(e) => handleChange('description', e.target.value)}
                       placeholder="Tell customers about your business, experience, and services..."
-                      rows="4"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      rows="5"
+                      maxLength="500"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base
+                               focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100
+                               transition-all resize-none"
                     />
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-gray-500">Share your expertise, experience, and what makes you unique</p>
+                      <p className="text-xs text-gray-400">{formData.description?.length || 0}/500</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Important Note */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-semibold mb-1">Important:</p>
+                      <p>These prices will be visible to customers. Make sure they accurately reflect your service charges.</p>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
+
+            {/* Step 7: Choose Visibility Plan */}
+            {currentStep === 7 && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Visibility Plan</h2>
+                  <p className="text-sm text-gray-600 mb-1">Select a plan that fits your business goals</p>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg mt-3">
+                    <Eye className="w-4 h-4 text-blue-600" />
+                    <p className="text-xs text-blue-700 font-medium">
+                      Plans affect your <strong>visibility on the platform</strong>, not your service charges
+                    </p>
+                  </div>
+                </div>
+
+                {/* Plan Cards Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+                  {visibilityPlans.map((plan) => {
+                    const PlanIcon = plan.icon;
+                    const isSelected = formData.selectedPlan === plan.id;
+                    const isPaid = plan.price > 0;
+                    
+                    // Static color classes based on plan.color
+                    const getColorClasses = () => {
+                      if (!isSelected) {
+                        return {
+                          border: 'border-gray-200',
+                          bg: 'bg-white',
+                          iconBg: plan.color === 'green' ? 'bg-green-100' : 
+                                  plan.color === 'indigo' ? 'bg-indigo-100' : 
+                                  plan.color === 'purple' ? 'bg-purple-100' : 'bg-amber-100',
+                          iconText: plan.color === 'green' ? 'text-green-600' : 
+                                    plan.color === 'indigo' ? 'text-indigo-600' : 
+                                    plan.color === 'purple' ? 'text-purple-600' : 'text-amber-600',
+                          checkIcon: 'text-green-600',
+                          borderT: 'border-gray-200',
+                          selectedText: ''
+                        };
+                      }
+                      
+                      return {
+                        border: plan.color === 'green' ? 'border-green-500' : 
+                                plan.color === 'indigo' ? 'border-indigo-500' : 
+                                plan.color === 'purple' ? 'border-purple-500' : 'border-amber-500',
+                        bg: plan.color === 'green' ? 'bg-green-50' : 
+                            plan.color === 'indigo' ? 'bg-indigo-50' : 
+                            plan.color === 'purple' ? 'bg-purple-50' : 'bg-amber-50',
+                        iconBg: plan.color === 'green' ? 'bg-green-500' : 
+                                plan.color === 'indigo' ? 'bg-indigo-500' : 
+                                plan.color === 'purple' ? 'bg-purple-500' : 'bg-amber-500',
+                        iconText: 'text-white',
+                        checkIcon: plan.color === 'green' ? 'text-green-600' : 
+                                   plan.color === 'indigo' ? 'text-indigo-600' : 
+                                   plan.color === 'purple' ? 'text-purple-600' : 'text-amber-600',
+                        borderT: plan.color === 'green' ? 'border-green-200' : 
+                                 plan.color === 'indigo' ? 'border-indigo-200' : 
+                                 plan.color === 'purple' ? 'border-purple-200' : 'border-amber-200',
+                        selectedText: plan.color === 'green' ? 'text-green-600' : 
+                                      plan.color === 'indigo' ? 'text-indigo-600' : 
+                                      plan.color === 'purple' ? 'text-purple-600' : 'text-amber-600'
+                      };
+                    };
+                    
+                    const colors = getColorClasses();
+                    
+                    return (
+                      <div
+                        key={plan.id}
+                        onClick={() => {
+                          handleChange('selectedPlan', plan.id);
+                          handleChange('planPrice', plan.price);
+                          handleChange('planDuration', plan.duration);
+                        }}
+                        className={`relative cursor-pointer rounded-2xl border-2 transition-all transform hover:scale-105 ${
+                          colors.border
+                        } ${colors.bg} ${
+                          isSelected ? 'shadow-xl' : 'hover:border-gray-300 hover:shadow-lg'
+                        } ${plan.popular ? 'ring-4 ring-indigo-100' : ''}`}
+                      >
+                        {/* Popular Badge */}
+                        {plan.popular && (
+                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                            <div className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-xs font-bold shadow-lg">
+                              <Sparkles className="w-3 h-3" />
+                              Most Popular
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-6">
+                          {/* Plan Header */}
+                          <div className="text-center mb-4">
+                            <div className={`inline-flex items-center justify-center w-14 h-14 rounded-full mb-3 ${colors.iconBg}`}>
+                              <PlanIcon className={`w-7 h-7 ${colors.iconText}`} />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">{plan.name}</h3>
+                            <div className="flex items-baseline justify-center gap-1">
+                              {plan.price === 0 ? (
+                                <span className="text-3xl font-bold text-green-600">Free</span>
+                              ) : (
+                                <>
+                                  <span className="text-2xl font-bold text-gray-900">₹{plan.price}</span>
+                                  <span className="text-sm text-gray-600">/{plan.duration}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Features */}
+                          <div className="space-y-2 mb-4">
+                            {plan.features.map((feature, idx) => (
+                              <div key={idx} className="flex items-start gap-2">
+                                <Check className={`w-4 h-4 flex-shrink-0 mt-0.5 ${colors.checkIcon}`} />
+                                <span className="text-xs text-gray-700">{feature}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Selection Indicator */}
+                          <div className={`text-center pt-4 border-t ${colors.borderT}`}>
+                            {isSelected ? (
+                              <div className={`flex items-center justify-center gap-2 ${colors.selectedText} font-semibold text-sm`}>
+                                <CheckCircle className="w-5 h-5" />
+                                Selected
+                              </div>
+                            ) : (
+                              <button className="text-sm text-gray-600 hover:text-gray-900 font-medium">
+                                Select Plan
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Plan Comparison Helper */}
+                <div className="mt-8 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <Award className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-1">Why upgrade?</h4>
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        Higher plans get better visibility in search results, featured placements on category pages, 
+                        verified badges that build trust, and priority customer support. Your service pricing remains 
+                        completely independent - you set your own rates regardless of the plan.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Gateway for Paid Plans */}
+                {formData.selectedPlan !== 'free' && formData.planPrice > 0 && (
+                  <div className="mt-6 bg-white border-2 border-gray-200 rounded-2xl overflow-hidden">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold text-white mb-1">Complete Your Payment</h4>
+                          <p className="text-xs text-blue-100">Secure & Encrypted Transaction</p>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full">
+                          <Lock className="w-4 h-4 text-white" />
+                          <span className="text-xs font-semibold text-white">100% Secure</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Payment Details */}
+                    <div className="p-6">
+                      {/* Plan Summary */}
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mb-6">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-xs text-gray-600 mb-1">Selected Plan</p>
+                            <h5 className="text-lg font-bold text-gray-900">{visibilityPlans.find(p => p.id === formData.selectedPlan)?.name} Plan</h5>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-green-600">₹{formData.planPrice}</p>
+                            <p className="text-xs text-gray-500">/{formData.planDuration}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Price Breakdown */}
+                        <div className="border-t border-green-200 pt-3 mt-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Subscription Fee</span>
+                            <span className="font-medium text-gray-900">₹{formData.planPrice}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">GST (18%)</span>
+                            <span className="font-medium text-gray-900">₹{Math.round(formData.planPrice * 0.18)}</span>
+                          </div>
+                          <div className="border-t border-green-300 pt-2 mt-2 flex justify-between">
+                            <span className="text-base font-bold text-gray-900">Total Amount</span>
+                            <span className="text-xl font-bold text-green-600">₹{formData.planPrice + Math.round(formData.planPrice * 0.18)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Payment Methods */}
+                      <div className="mb-6">
+                        <h5 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-blue-600" />
+                          Choose Payment Method
+                        </h5>
+                        {paymentError && (
+                          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                            <span className="text-xs text-red-700">{paymentError}</span>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {/* UPI */}
+                          <button 
+                            onClick={() => handlePaymentMethodSelect('upi')}
+                            className={`group border-2 rounded-xl p-4 transition-all hover:shadow-md ${
+                              selectedPaymentMethod === 'upi' 
+                                ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                                : 'border-gray-200 hover:border-blue-500'
+                            }`}
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-50 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Smartphone className="w-6 h-6 text-purple-600" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700">UPI</span>
+                              <span className="text-[10px] text-gray-500">GPay, PhonePe</span>
+                              {selectedPaymentMethod === 'upi' && (
+                                <CheckCircle className="w-4 h-4 text-blue-600 absolute top-2 right-2" />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Cards */}
+                          <button 
+                            onClick={() => handlePaymentMethodSelect('card')}
+                            className={`group border-2 rounded-xl p-4 transition-all hover:shadow-md relative ${
+                              selectedPaymentMethod === 'card' 
+                                ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                                : 'border-gray-200 hover:border-blue-500'
+                            }`}
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-50 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <CreditCard className="w-6 h-6 text-blue-600" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700">Cards</span>
+                              <span className="text-[10px] text-gray-500">Credit/Debit</span>
+                              {selectedPaymentMethod === 'card' && (
+                                <CheckCircle className="w-4 h-4 text-blue-600 absolute top-2 right-2" />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Net Banking */}
+                          <button 
+                            onClick={() => handlePaymentMethodSelect('netbanking')}
+                            className={`group border-2 rounded-xl p-4 transition-all hover:shadow-md relative ${
+                              selectedPaymentMethod === 'netbanking' 
+                                ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                                : 'border-gray-200 hover:border-blue-500'
+                            }`}
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-50 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Building className="w-6 h-6 text-green-600" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700">Banking</span>
+                              <span className="text-[10px] text-gray-500">Net Banking</span>
+                              {selectedPaymentMethod === 'netbanking' && (
+                                <CheckCircle className="w-4 h-4 text-blue-600 absolute top-2 right-2" />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Wallets */}
+                          <button 
+                            onClick={() => handlePaymentMethodSelect('wallet')}
+                            className={`group border-2 rounded-xl p-4 transition-all hover:shadow-md relative ${
+                              selectedPaymentMethod === 'wallet' 
+                                ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                                : 'border-gray-200 hover:border-blue-500'
+                            }`}
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-50 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Wallet className="w-6 h-6 text-orange-600" />
+                              </div>
+                              <span className="text-xs font-semibold text-gray-700">Wallets</span>
+                              <span className="text-[10px] text-gray-500">Paytm, Amazon</span>
+                              {selectedPaymentMethod === 'wallet' && (
+                                <CheckCircle className="w-4 h-4 text-blue-600 absolute top-2 right-2" />
+                              )}
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Payment Actions */}
+                      <div className="space-y-3">
+                        {/* Pay Now Button */}
+                        <button 
+                          onClick={handlePayNow}
+                          disabled={!selectedPaymentMethod || paymentState !== 'idle'}
+                          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all group disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-green-600 disabled:hover:to-emerald-600"
+                        >
+                          <Lock className="w-5 h-5" />
+                          <span>Pay ₹{formData.planPrice + Math.round(formData.planPrice * 0.18)} Now</span>
+                          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                        </button>
+
+                        {/* Pay Later Option */}
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-200"></div>
+                          </div>
+                          <div className="relative flex justify-center text-xs">
+                            <span className="bg-white px-3 text-gray-500 font-medium">OR</span>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={handlePayLater}
+                          className="w-full border-2 border-blue-200 hover:border-blue-400 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition-all"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          <span>Pay Later from Dashboard</span>
+                        </button>
+
+                        {/* Info Note */}
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                          <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 leading-relaxed">
+                            <span className="font-semibold">Pay Later:</span> You can complete registration now and make payment from your dashboard. 
+                            Your account will be active, but premium features will activate after payment confirmation.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Trust Badges */}
+                      <div className="mt-6 pt-4 border-t border-gray-200">
+                        <div className="flex items-center justify-center gap-6 text-xs text-gray-500">
+                          <div className="flex items-center gap-1">
+                            <Shield className="w-4 h-4 text-green-600" />
+                            <span>SSL Secured</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Lock className="w-4 h-4 text-blue-600" />
+                            <span>PCI Compliant</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <CheckCircle className="w-4 h-4 text-purple-600" />
+                            <span>Razorpay Secured</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Payment Processing Modal Overlays */}
+          {(paymentState === 'initiating' || paymentState === 'processing' || paymentState === 'verifying') && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+                {/* Animated Spinner */}
+                <div className="mb-6 flex justify-center">
+                  <div className="relative">
+                    <div className="w-20 h-20 border-4 border-blue-200 rounded-full"></div>
+                    <div className="w-20 h-20 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Lock className="w-8 h-8 text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Processing Status */}
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  {paymentState === 'initiating' && 'Initiating Payment...'}
+                  {paymentState === 'processing' && 'Processing Payment'}
+                  {paymentState === 'verifying' && 'Verifying Payment'}
+                </h3>
+                <p className="text-sm text-gray-600 mb-6">
+                  {paymentState === 'initiating' && 'Connecting to secure payment gateway'}
+                  {paymentState === 'processing' && 'Please wait while we process your payment securely'}
+                  {paymentState === 'verifying' && 'Payment received! Verifying transaction...'}
+                </p>
+
+                {/* Security Indicators */}
+                <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-green-600" />
+                    <span>Encrypted</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-blue-600" />
+                    <span>Secured</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-purple-600" />
+                    <span>PCI DSS</span>
+                  </div>
+                </div>
+
+                {/* Do Not Close Warning */}
+                <div className="mt-6 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-xs text-amber-800 font-medium">
+                    ⚠️ Please do not close this window or press back button
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Success Modal */}
+          {paymentState === 'success' && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                {/* Success Animation */}
+                <div className="mb-6 flex justify-center">
+                  <div className="relative">
+                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-16 h-16 text-green-600 animate-pulse" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Star className="w-5 h-5 text-white fill-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Success Message */}
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Your payment has been processed successfully
+                  </p>
+
+                  {/* Payment Details */}
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 text-left space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Plan</span>
+                      <span className="font-semibold text-gray-900">
+                        {visibilityPlans.find(p => p.id === formData.selectedPlan)?.name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Amount Paid</span>
+                      <span className="font-bold text-green-600">
+                        ₹{formData.planPrice + Math.round(formData.planPrice * 0.18)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Payment ID</span>
+                      <span className="font-mono text-xs text-gray-700">{paymentId.substring(0, 20)}...</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Payment Method</span>
+                      <span className="font-medium text-gray-900 capitalize">{selectedPaymentMethod}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Benefits */}
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <h4 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    Your Plan Benefits
+                  </h4>
+                  <ul className="space-y-1 text-xs text-gray-700">
+                    {visibilityPlans.find(p => p.id === formData.selectedPlan)?.features.slice(0, 3).map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <CheckCircle className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Action Button */}
+                <button
+                  onClick={handlePaymentSuccess}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all group"
+                >
+                  <span>Complete Registration</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                {/* Receipt Note */}
+                <p className="text-xs text-center text-gray-500 mt-4">
+                  📧 Payment receipt will be sent to {formData.email}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Failed Modal */}
+          {paymentState === 'failed' && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+                {/* Error Icon */}
+                <div className="mb-6 flex justify-center">
+                  <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center">
+                    <AlertCircle className="w-16 h-16 text-red-600" />
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Failed</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    We couldn't process your payment
+                  </p>
+
+                  {/* Error Details */}
+                  {paymentError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left mb-4">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-800">{paymentError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Common Reasons */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-left">
+                    <h4 className="text-sm font-bold text-gray-900 mb-2">Common reasons:</h4>
+                    <ul className="space-y-1 text-xs text-gray-700">
+                      <li className="flex items-start gap-2">
+                        <span className="text-gray-400">•</span>
+                        <span>Insufficient balance or credit limit</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-gray-400">•</span>
+                        <span>Incorrect card details or expired card</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-gray-400">•</span>
+                        <span>Transaction declined by bank</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-gray-400">•</span>
+                        <span>Network connectivity issues</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <button
+                    onClick={handlePaymentRetry}
+                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <ArrowRight className="w-5 h-5 rotate-180" />
+                    <span>Try Again</span>
+                  </button>
+
+                  <button
+                    onClick={handlePayLater}
+                    className="w-full border-2 border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 rounded-xl transition-all"
+                  >
+                    Register with Free Plan Instead
+                  </button>
+                </div>
+
+                {/* Support Note */}
+                <p className="text-xs text-center text-gray-500 mt-4">
+                  Need help? Contact support at support@example.com
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Success Message with Login Instructions */}
           {success && (

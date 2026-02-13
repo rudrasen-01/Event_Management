@@ -42,6 +42,7 @@ import {
   fetchAllUsers,
   updateUserStatus,
   fetchAllVendorsAdmin,
+  fetchVendorById,
   toggleVendorVerification,
   toggleVendorStatus,
   deleteVendorPermanent,
@@ -776,7 +777,38 @@ const AdminPanel = () => {
                   </div>
                   <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-3 rounded-xl">
                     <p className="text-xs text-pink-600 font-medium mb-1">Vendor</p>
-                    <p className="font-bold text-gray-900 truncate">{inquiry.vendorId?.businessName || inquiry.vendorId?.name || 'General'}</p>
+                    <p className="font-bold text-gray-900 truncate">
+                      {inquiry.vendorId ? (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const vendorObj = inquiry.vendorId && (inquiry.vendorId._id || inquiry.vendorId.businessName) ? inquiry.vendorId : null;
+                              if (vendorObj && vendorObj.businessName) {
+                                setSelectedItem(vendorObj);
+                                return;
+                              }
+
+                              const vendorId = inquiry.vendorId._id || inquiry.vendorId;
+                              if (!vendorId) {
+                                showNotification('info', 'No vendor details available');
+                                return;
+                              }
+
+                              const data = await fetchVendorById(vendorId);
+                              if (data) setSelectedItem(data);
+                              else showNotification('error', 'Vendor not found');
+                            } catch (err) {
+                              console.error('Failed to load vendor:', err);
+                              showNotification('error', 'Failed to load vendor details');
+                            }
+                          }}
+                          className="text-left underline hover:text-indigo-600"
+                        >
+                          {inquiry.vendorId?.businessName || inquiry.vendorId?.name || String(inquiry.vendorId)}
+                        </button>
+                      ) : 'General'}
+                    </p>
                   </div>
                 </div>
 
@@ -841,6 +873,15 @@ const AdminPanel = () => {
                       Rejected - No Further Action
                     </div>
                   )}
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedItem(inquiry)}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-bold flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    View Details
+                  </button>
                 </div>
               </div>
             </div>
@@ -1015,6 +1056,13 @@ const AdminPanel = () => {
                   >
                     <Trash2 className="w-5 h-5" />
                     Delete
+                  </button>
+                  <button
+                    onClick={() => setSelectedItem(vendor)}
+                    className="px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold transition-all flex items-center gap-2 text-sm shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    <Eye className="w-5 h-5" />
+                    View Details
                   </button>
                 </div>
               </div>
@@ -1272,6 +1320,58 @@ const AdminPanel = () => {
 
       {/* Notification */}
       <Notification />
+      {/* Details Modal */}
+      {selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black opacity-40" onClick={() => setSelectedItem(null)}></div>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 z-50 p-6 animate-modalSlideIn">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Details</h3>
+              <button onClick={() => setSelectedItem(null)} className="text-gray-600 hover:text-gray-900"><X className="w-5 h-5" /></button>
+            </div>
+
+            {/* User */}
+            {selectedItem.name && (
+              <div className="space-y-2">
+                <p className="text-lg font-bold">{selectedItem.name}</p>
+                <p className="text-sm text-gray-600">{selectedItem.email}</p>
+                {selectedItem.phone && <p className="text-sm text-gray-600">{selectedItem.phone}</p>}
+                <p className="text-sm text-gray-500">Role: {selectedItem.role || 'user'}</p>
+                <p className="text-sm text-gray-500">Joined: {selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleString() : 'N/A'}</p>
+              </div>
+            )}
+
+            {/* Vendor */}
+            {selectedItem.businessName && (
+              <div className="space-y-2">
+                <p className="text-lg font-bold">{selectedItem.businessName}</p>
+                <p className="text-sm text-gray-600">Contact: {selectedItem.contact?.email || selectedItem.email}</p>
+                {selectedItem.contact?.phone && <p className="text-sm text-gray-600">Phone: {selectedItem.contact.phone}</p>}
+                <p className="text-sm text-gray-500">Service: {selectedItem.serviceType || 'N/A'}</p>
+                <p className="text-sm text-gray-500">City: {selectedItem.city || 'N/A'}</p>
+                <p className="text-sm text-gray-500">Verified: {selectedItem.verified ? 'Yes' : 'No'}</p>
+                <p className="text-sm text-gray-500">Status: {selectedItem.isActive ? 'Active' : 'Inactive'}</p>
+              </div>
+            )}
+
+            {/* Inquiry */}
+            {selectedItem.userName && (
+              <div className="space-y-2">
+                <p className="text-lg font-bold">Inquiry from {selectedItem.userName}</p>
+                <p className="text-sm text-gray-600">Contact: {selectedItem.userContact} • {selectedItem.userEmail}</p>
+                <p className="text-sm text-gray-500">Event: {selectedItem.eventType}</p>
+                <p className="text-sm text-gray-500">City: {selectedItem.city || 'N/A'}</p>
+                <p className="text-sm text-gray-500">Budget: ₹{selectedItem.budget || 'N/A'}</p>
+                {selectedItem.message && <div className="mt-2 p-3 bg-gray-50 rounded-lg"><p className="text-sm text-gray-700">{selectedItem.message}</p></div>}
+              </div>
+            )}
+
+            <div className="mt-6 text-right">
+              <button onClick={() => setSelectedItem(null)} className="px-4 py-2 bg-gray-200 rounded-lg">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm Dialog */}
       <ConfirmDialog

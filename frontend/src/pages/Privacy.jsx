@@ -7,45 +7,36 @@ const Privacy = () => {
       icon: Eye,
       title: 'Information We Collect',
       content: [
-        'Personal information you provide when registering (name, email, phone)',
-        'Event inquiry details (event type, budget, location, requirements)',
-        'Vendor business information (company details, services, documents)',
-        'Usage data and analytics to improve our platform',
-        'Communication records between customers and vendors through our platform'
+        'For Vendors: Business names, contact persons, phone numbers, email addresses, business addresses, and portfolio images/videos',
+        'For Users (Customers): Names, contact numbers, email addresses, and event requirements (location, budget, and date)',
+        'Technical Data: IP addresses, browser types, and usage patterns through cookies to improve your experience'
       ]
     },
     {
       icon: Lock,
       title: 'How We Use Your Information',
       content: [
-        'Connect customers with suitable vendors based on requirements',
-        'Facilitate communication through our managed inquiry system',
-        'Verify vendor credentials and maintain platform quality',
-        'Send important updates about your inquiries and account',
-        'Improve our services and develop new features',
-        'Prevent fraud and ensure platform security'
+        'To Facilitate Connections: We use user data to match customers with the right vendors based on budget and location',
+        'Enquiry Verification: To maintain platform quality, our team uses your contact details to verify that an enquiry is genuine before passing it to a vendor',
+        'Communication: We use your information to send subscription alerts, booking notifications, and platform updates',
+        'Marketing: With your consent, we may send promotional offers or newsletters'
       ]
     },
     {
       icon: Users,
-      title: 'Information Sharing',
+      title: 'Data Sharing and Disclosure',
       content: [
-        'We DO NOT sell or rent your personal information to third parties',
-        'Customer contact details are NOT shared directly with vendors',
-        'Vendor information is shared with customers only for inquiry purposes',
-        'We may share aggregated, non-personal data for analytics',
-        'Legal compliance: We may disclose information if required by law'
+        'Verified Sharing: A customer\'s contact details are shared only with the specific vendors they have enquired about, and only after AIS has verified the enquiry',
+        'No Data Selling: We do not sell, rent, or trade your personal information to third-party marketing companies',
+        'Legal Requirements: We may disclose information if required by law or to protect the rights and safety of our users'
       ]
     },
     {
       icon: Database,
       title: 'Data Security',
       content: [
-        'All data is encrypted in transit and at rest',
-        'Regular security audits and monitoring',
-        'Access controls and authentication for all systems',
-        'Secure hosting infrastructure with backup systems',
-        'Staff training on data protection best practices'
+        'We implement industry-standard security measures (such as SSL encryption) to protect your data',
+        'However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security'
       ]
     }
   ];
@@ -56,12 +47,12 @@ const Privacy = () => {
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <Shield className="w-16 h-16 mx-auto mb-6" />
-          <h1 className="text-4xl font-bold mb-4">Privacy Policy</h1>
+          <h1 className="text-4xl font-bold mb-4">Privacy Policy - AIS Signature Events</h1>
           <p className="text-xl mb-4">
             Your privacy is important to us. This policy explains how we collect, use, and protect your information.
           </p>
           <p className="text-sm opacity-90">
-            Last updated: January 30, 2026
+            Last Updated: February 2026
           </p>
         </div>
       </div>
@@ -69,12 +60,9 @@ const Privacy = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Introduction */}
         <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Introduction</h2>
-          <p className="text-gray-600 leading-relaxed mb-4">
-            AIS Signature Event (\"we\", \"our\", or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our event planning platform.
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Introduction</h2>
           <p className="text-gray-600 leading-relaxed">
-            By using our service, you agree to the collection and use of information in accordance with this policy. If you do not agree with our policies and practices, do not use our service.
+            AIS Signature Events (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you visit our website or use our mobile application.
           </p>
         </div>
 
@@ -100,39 +88,25 @@ const Privacy = () => {
         <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
           <div className="flex items-center mb-6">
             <Users className="w-8 h-8 text-indigo-600 mr-4" />
-            <h2 className="text-2xl font-bold text-gray-900">Your Rights</h2>
+            <h2 className="text-2xl font-bold text-gray-900">6. Your Rights</h2>
           </div>
-          <p className="text-gray-600 leading-relaxed mb-4">
-            You have the following rights regarding your personal information:
-          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Access & Portability</h3>
-              <p className="text-gray-600 text-sm">Request a copy of your personal data and download your information.</p>
+              <h3 className="font-semibold text-gray-900 mb-2">Access and Correction</h3>
+              <p className="text-gray-600 text-sm">You have the right to access and update your personal or business information at any time through your profile dashboard.</p>
             </div>
             <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Correction</h3>
-              <p className="text-gray-600 text-sm">Update or correct inaccurate personal information.</p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Deletion</h3>
-              <p className="text-gray-600 text-sm">Request deletion of your personal data (subject to legal requirements).</p>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-2">Objection</h3>
-              <p className="text-gray-600 text-sm">Object to certain processing activities of your personal data.</p>
+              <h3 className="font-semibold text-gray-900 mb-2">Data Deletion</h3>
+              <p className="text-gray-600 text-sm">You may request the deletion of your account and data by contacting our support team.</p>
             </div>
           </div>
         </div>
 
         {/* Cookies */}
         <div className="bg-white rounded-xl shadow-sm p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Cookies and Tracking</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">7. Cookies</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            We use cookies and similar technologies to enhance your experience, analyze usage, and provide personalized content. You can manage cookie preferences through your browser settings.
-          </p>
-          <p className="text-gray-600 leading-relaxed">
-            Essential cookies are necessary for the platform to function. Analytics cookies help us understand how users interact with our service to improve performance.
+            Our website uses cookies to enhance user experience. You can choose to disable cookies through your browser settings, though some features of the site may not function properly.
           </p>
         </div>
 
@@ -140,32 +114,26 @@ const Privacy = () => {
         <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-8">
           <div className="flex items-center mb-6">
             <Mail className="w-8 h-8 text-indigo-600 mr-4" />
-            <h2 className="text-2xl font-bold text-gray-900">Contact Us About Privacy</h2>
+            <h2 className="text-2xl font-bold text-gray-900">9. Contact Us</h2>
           </div>
           <p className="text-gray-600 leading-relaxed mb-6">
-            If you have questions about this Privacy Policy or wish to exercise your rights, please contact us:
+            If you have any questions about this Privacy Policy, please contact us at:
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Email</h3>
-              <p className="text-gray-600">privacy@aissignatureevent.com</p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Address</h3>
-              <p className="text-gray-600">
-                123 Business Center<br />
-                Indore, Madhya Pradesh 452001<br />
-                India
-              </p>
+              <a href="mailto:info@aissignatureevent.com" className="text-indigo-600 hover:text-indigo-700">
+                info@aissignatureevent.com
+              </a>
             </div>
           </div>
         </div>
 
         {/* Updates */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mt-8">
-          <h3 className="font-semibold text-yellow-900 mb-2">Policy Updates</h3>
+          <h3 className="font-semibold text-yellow-900 mb-2">8. Changes to This Policy</h3>
           <p className="text-yellow-800 text-sm">
-            We may update this Privacy Policy periodically. We will notify you of significant changes via email or through our platform. Continued use of our service after changes constitutes acceptance of the updated policy.
+            AIS Signature Events reserves the right to update this Privacy Policy. We will notify users of significant changes by posting a notice on our platform.
           </p>
         </div>
       </div>

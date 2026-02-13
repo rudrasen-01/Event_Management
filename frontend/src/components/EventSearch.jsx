@@ -49,11 +49,13 @@ const EventSearch = () => {
           fetchCities(),
           fetchServiceTypes()
         ]);
+        console.log('🏙️ Cities loaded:', citiesData?.length || 0, citiesData?.slice(0, 3));
+        console.log('🎯 Services loaded:', servicesData?.length || 0);
         // Ensure arrays are returned
         setCities(Array.isArray(citiesData) ? citiesData : []);
         setServiceTypes(Array.isArray(servicesData) ? servicesData : []);
       } catch (error) {
-        console.error('Failed to load dynamic data:', error);
+        console.error('❌ Failed to load dynamic data:', error);
         setCities([]);
         setServiceTypes([]);
       } finally {
@@ -297,7 +299,10 @@ const EventSearch = () => {
                             >
                               <div>
                                 <div className="text-sm font-medium text-gray-900">{city.name}</div>
-                                <div className="text-xs text-gray-500">{city.state} {city.count && `(${city.count})`}</div>
+                                <div className="text-xs text-gray-500">
+                                  {city.state}
+                                  {city.count > 0 && <span className="ml-1 text-indigo-600 font-medium">• {city.count} vendors</span>}
+                                </div>
                               </div>
                             </button>
                           ))}

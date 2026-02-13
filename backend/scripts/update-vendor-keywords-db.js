@@ -20,12 +20,12 @@ const updateVendorKeywords = async () => {
     // Check if ServiceKeywords collection has data
     const keywordCount = await ServiceKeywords.countDocuments();
     if (keywordCount === 0) {
-      console.log('⚠️  ServiceKeywords collection is empty!');
-      console.log('   Run: node scripts/seed-service-keywords.js first');
-      process.exit(1);
+      console.log('ℹ️  ServiceKeywords collection is empty.');
+      console.log('   Vendors will use basic keywords (name, city, area, service type).');
+      console.log('   Add keywords via Admin Panel for enhanced search.\n');
+    } else {
+      console.log(`📊 Found ${keywordCount} keyword patterns in database\n`);
     }
-    
-    console.log(`📊 Found ${keywordCount} keyword patterns in database\n`);
     
     const vendors = await Vendor.find({ isActive: true });
     console.log(`📊 Found ${vendors.length} active vendors\n`);

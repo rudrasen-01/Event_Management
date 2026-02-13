@@ -48,9 +48,15 @@ export const fetchServiceTypes = async () => {
 export const fetchCities = async () => {
   try {
     const response = await apiClient.get('/dynamic/cities');
+    console.log('📡 API Response:', {
+      status: response.status,
+      data: response.data,
+      dataArray: response.data?.data,
+      total: response.data?.total
+    });
     return response.data?.data || [];
   } catch (error) {
-    console.error('Error fetching cities:', error);
+    console.error('❌ Error fetching cities:', error.message, error.response?.data);
     return [];
   }
 };

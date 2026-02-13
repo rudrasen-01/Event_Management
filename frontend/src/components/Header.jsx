@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown, User as UserIcon, LogOut, Settings, LayoutDashboard, Shield, Sparkles, Calendar } from 'lucide-react';
+import { Menu, X, ChevronDown, User as UserIcon, LogOut, Settings, LayoutDashboard, Shield, Sparkles, Calendar, UserCircle } from 'lucide-react';
 import VendorLoginModal from './VendorLoginModal';
 import UserLoginModal from './UserLoginModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -210,6 +210,23 @@ const Header = () => {
                         </button>
                         
                         <button
+                          onClick={() => {
+                            setShowVendorMenu(false);
+                            navigate('/vendor-dashboard');
+                            setTimeout(() => {
+                              const event = new CustomEvent('changeVendorTab', { detail: 'profile' });
+                              window.dispatchEvent(event);
+                            }, 100);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-purple-600 transition-all"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                            <UserCircle className="w-4 h-4 text-indigo-600" />
+                          </div>
+                          <span>My Profile</span>
+                        </button>
+                        
+                        <button
                           onClick={() => handleVendorMenuClick('/vendor-profile')}
                           className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-purple-600 transition-all"
                         >
@@ -416,6 +433,21 @@ const Header = () => {
                   >
                     <LayoutDashboard className="w-5 h-5 inline mr-3" />
                     My Dashboard
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      navigate('/vendor-dashboard');
+                      setTimeout(() => {
+                        const event = new CustomEvent('changeVendorTab', { detail: 'profile' });
+                        window.dispatchEvent(event);
+                      }, 100);
+                    }}
+                    className="block w-full px-4 py-3 text-left text-gray-700 font-semibold border-2 border-indigo-300 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-all"
+                  >
+                    <UserCircle className="w-5 h-5 inline mr-3" />
+                    My Profile
                   </button>
                   
                   <button

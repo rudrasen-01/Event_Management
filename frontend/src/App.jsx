@@ -17,6 +17,8 @@ import DynamicSearchPage from './pages/DynamicSearchPage';
 import SearchEventsPage from './pages/SearchEventsPage';
 import VendorRegistrationMultiStep from './pages/VendorRegistrationMultiStep';
 import VendorDashboard from './pages/VendorDashboard';
+import VendorProfilePage from './pages/VendorProfilePage';
+import VendorProfileDashboard from './pages/VendorProfileDashboard';
 import AdminPanel from './pages/AdminPanel';
 import UserDashboardNew from './pages/UserDashboardNew';
 import About from './pages/About';
@@ -26,6 +28,7 @@ import Contact from './pages/Contact';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import PlansPage from './pages/PlansPage';
+import WhatsAppButton from './components/WhatsAppButton';
 
 function App() {
   return (
@@ -84,6 +87,10 @@ function App() {
                 {/* Vendor routes - separate from user/admin authentication */}
                 <Route path="/vendor-registration" element={<VendorRegistrationMultiStep />} />
                 <Route path="/vendor-dashboard" element={<VendorDashboard />} />
+                <Route path="/vendor-profile-dashboard" element={<VendorProfileDashboard />} />
+                
+                {/* Public Vendor Profile Page */}
+                <Route path="/vendor/:vendorId" element={<VendorProfilePage />} />
                 
                 {/* Catch all route - 404 */}
                 <Route path="*" element={<NotFound />} />
@@ -91,6 +98,7 @@ function App() {
             </main>
             <Footer />
             <ToastContainer />
+            <WhatsAppButton />
           </div>
         </SearchProvider>
       </AuthProvider>
