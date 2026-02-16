@@ -193,6 +193,62 @@ areaSchema.statics.getByCityOsmId = function(cityOsmId) {
     .select('name osm_id lat lon placeType');
 };
 
+/**
+ * AUTO-CREATE OR UPDATE AREA FROM VENDOR REGISTRATION
+ * This method is called when a vendor registers with a new area
+ * @param {Object} areaData - { cityId, cityName, cityOsmId, area, lat, lon }
+ * @returns {Promise<Area>} - The created or updated area document
+ */
+areaSchema.statics.createOrUpdateFromVendor = async function(areaData) {
+  const { cityId, cityName, cityOsmId, area, lat, lon } = areaData;
+  
+  if (!area || !cityId || !lat || !lon) {
+    throw new Error('Missing required area data for auto-creation');
+  }
+  
+  // Create unique ID for this area
+  const areaOsmId = `vendor/${cityName}/${area}`.toLowerCase().replace(/\s+/g, '-');
+  
+  // Check if area already exists
+  const existing = await this.findOne({ osm_id: areaOsmId });
+  
+  if (existing) {
+    // Update vendor count
+    existing.hasVendors = true;
+    existing.vendorCount = (existing.vendorCount || 0) + 1;
+    existing.updatedAt = new Date();
+    await existing.save();
+    console.log(`✅ Updated existing area: ${area} in ${cityName} (vendors: ${existing.vendorCount})`);
+    return existing;
+  }
+  
+  // Create new area
+  const newArea = await this.create({
+    osm_id: areaOsmId,
+    name: area,
+    normalizedName: area.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim(),
+    city_id: cityId,
+    cityName: cityName,
+    cityOsmId: cityOsmId || `vendor-city/${cityName}`.toLowerCase(),
+    placeType: 'locality',
+    location: {
+      type: 'Point',
+      coordinates: [lon, lat]
+    },
+    lat: lat,
+    lon: lon,
+    osmTags: {
+      source: 'vendor_registration',
+      auto_created: 'true'
+    },
+    hasVendors: true,
+    vendorCount: 1
+  });
+  
+  console.log(`✅ Auto-created new area: ${area} in ${cityName}`);
+  return newArea;
+};
+
 const Area = mongoose.model('Area', areaSchema);
 
 module.exports = Area;

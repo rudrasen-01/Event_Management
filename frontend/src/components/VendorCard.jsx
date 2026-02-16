@@ -11,6 +11,7 @@ import { useSearch } from '../contexts/SearchContext';
  * - Service type, pricing, location, ratings
  * - Professional responsive design
  * - Complete vendor information display
+ * - Section-based display (section headers communicate tier)
  */
 const VendorCard = ({ 
   vendor, 
@@ -18,7 +19,8 @@ const VendorCard = ({
   showRating = true, 
   variant = 'default',
   userLocation,
-  prefilledEventType = ''
+  prefilledEventType = '',
+  sectionLabel = null  // Section label from parent (e.g., "In Your Area", "Nearby")
 }) => {
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const navigate = useNavigate();

@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
+import { useNavigate } from 'react-router-dom';
 import { getApiUrl } from '../config/api';
+import { useVendorAuth } from '../contexts/VendorAuthContext';
 
-const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
+const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess, initialEmail }) => {
+  const [email, setEmail] = useState(initialEmail || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const { setVendor, setVendorToken } = useVendorAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,10 +57,17 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         localStorage.setItem('vendorId', vendor._id);
         localStorage.setItem('vendorEmail', vendor.email);
         localStorage.setItem('vendorBusinessName', vendor.businessName || vendor.name);
+        localStorage.setItem('vendorData', JSON.stringify(vendor));
         localStorage.setItem('userRole', 'vendor');
         
-        // Call success callback
-        onLoginSuccess(vendor);
+        // Update VendorAuthContext
+        setVendor(vendor);
+        setVendorToken(token);
+        
+        // Call success callback if provided
+        if (onLoginSuccess) {
+          onLoginSuccess(vendor);
+        }
         
         // Close modal
         onClose();
@@ -64,6 +75,9 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         // Reset form
         setEmail('');
         setPassword('');
+        
+        // Navigate to vendor dashboard
+        navigate('/vendor-dashboard');
       } else {
         setError(data.error?.message || data.message || 'Login failed. Please check your credentials.');
       }
@@ -122,10 +136,17 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             localStorage.setItem('vendorId', vendor._id);
             localStorage.setItem('vendorEmail', vendor.email);
             localStorage.setItem('vendorBusinessName', vendor.businessName || vendor.name);
+            localStorage.setItem('vendorData', JSON.stringify(vendor));
             localStorage.setItem('userRole', 'vendor');
             
-            // Call success callback
-            onLoginSuccess(vendor);
+            // Update VendorAuthContext
+            setVendor(vendor);
+            setVendorToken(token);
+            
+            // Call success callback if provided
+            if (onLoginSuccess) {
+              onLoginSuccess(vendor);
+            }
             
             // Close modal
             onClose();
@@ -133,6 +154,9 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             // Reset form
             setEmail('');
             setPassword('');
+            
+            // Navigate to vendor dashboard
+            navigate('/vendor-dashboard');
           } else {
             throw new Error(loginData.error?.message || 'Google sign-in failed');
           }
@@ -153,6 +177,13 @@ const VendorLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     },
     flow: 'auth-code',
   });
+
+  // Set initial email if provided
+  useEffect(() => {
+    if (initialEmail) {
+      setEmail(initialEmail);
+    }
+  }, [initialEmail]);
 
   // prevent background scroll while modal is open
   useEffect(() => {

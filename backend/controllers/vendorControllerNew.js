@@ -96,11 +96,11 @@ exports.registerVendor = async (req, res, next) => {
     const {
       name,
       serviceType,
-      location,
       city,
       area,
       address,
       pincode,
+      landmark, // New: Landmark/nearby reference
       pricing,
       filters,
       contact,
@@ -137,7 +137,7 @@ exports.registerVendor = async (req, res, next) => {
       });
     }
     
-    // Validate service type (basic check - just ensure it's not empty)
+    // Validate service type
     if (!serviceType || typeof serviceType !== 'string' || serviceType.trim() === '') {
       return res.status(400).json({
         success: false,
@@ -149,7 +149,19 @@ exports.registerVendor = async (req, res, next) => {
       });
     }
     
-    // Optional: Validate filters against service schema if service exists in DB
+    // Validate city and area
+    if (!city || !area) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_LOCATION',
+          message: 'City and area are required',
+          details: {}
+        }
+      });
+    }
+    
+    // Optional: Validate filters against service schema
     const service = await Service.findOne({ 
       serviceId: serviceType.toLowerCase(),
       isActive: true 
@@ -158,34 +170,85 @@ exports.registerVendor = async (req, res, next) => {
     if (service && filters) {
       const validation = service.validateFilters(filters);
       if (!validation.isValid) {
-        console.warn('Filter validation failed but proceeding with registration:', validation.errors);
-        // Don't block registration, just log warning
+        console.warn('⚠️  Filter validation failed but proceeding:', validation.errors);
       }
     }
     
-    // Validate geospatial coordinates
-    if (!location || !location.coordinates || location.coordinates.length !== 2) {
+    // ========================================================================
+    // GEOCODING: Convert address to coordinates (ONCE at registration)
+    // ========================================================================
+    const geocodingService = require('../services/geocodingService');
+    const City = require('../models/City');
+    const Area = require('../models/Area');
+    
+    let coordinates, geocodedAddress;
+    
+    try {
+      console.log(`🌍 Geocoding vendor location: ${city}, ${area}, ${pincode}`);
+      
+      // Use smart fallback strategy for better accuracy
+      const geocodeResult = await geocodingService.geocodeWithFallback({
+        area,
+        city,
+        pincode,
+        landmark
+      });
+      
+      coordinates = [geocodeResult.lon, geocodeResult.lat];
+      geocodedAddress = geocodeResult.displayName;
+      
+      console.log(`✅ Geocoded to: [${coordinates[0]}, ${coordinates[1]}]`);
+      
+    } catch (geocodeError) {
+      console.error(`❌ Geocoding failed: ${geocodeError.message}`);
       return res.status(400).json({
         success: false,
         error: {
-          code: 'INVALID_LOCATION',
-          message: 'Location coordinates [longitude, latitude] are required',
-          details: {}
+          code: 'GEOCODING_FAILED',
+          message: `Could not find location: ${area}, ${city}, ${pincode}. Please verify the address is correct.`,
+          details: { error: geocodeError.message }
         }
       });
     }
     
-    // Create vendor
+    // ========================================================================
+    // AUTO-CREATE OR UPDATE AREA in areas collection
+    // ========================================================================
+    try {
+      // Find city in database
+      const cityDoc = await City.findOne({ 
+        name: new RegExp(`^${city}$`, 'i')
+      });
+      
+      if (cityDoc && area) {
+        // Auto-create/update area
+        await Area.createOrUpdateFromVendor({
+          cityId: cityDoc._id,
+          cityName: cityDoc.name,
+          cityOsmId: cityDoc.osm_id,
+          area: area,
+          lat: coordinates[1],
+          lon: coordinates[0]
+        });
+      }
+    } catch (areaError) {
+      console.warn(`⚠️  Failed to auto-create area: ${areaError.message}`);
+      // Don't block vendor registration if area creation fails
+    }
+    
+    // ========================================================================
+    // CREATE VENDOR with geocoded coordinates
+    // ========================================================================
     const vendor = await Vendor.create({
       name,
       serviceType: serviceType.toLowerCase(),
       location: {
         type: 'Point',
-        coordinates: location.coordinates // [longitude, latitude]
+        coordinates: coordinates // [longitude, latitude] from geocoding
       },
       city,
       area,
-      address,
+      address: address || geocodedAddress,
       pincode,
       pricing: {
         min: pricing.min,
@@ -210,8 +273,10 @@ exports.registerVendor = async (req, res, next) => {
       portfolio: portfolio || [],
       serviceAreas: serviceAreas || [],
       verified: false,
-      isActive: false  // Vendors start inactive, admin must activate after review
+      isActive: false  // Vendors start inactive, admin must activate
     });
+    
+    console.log(`✅ Vendor registered: ${vendor.name} at ${area}, ${city}`);
     
     res.status(201).json({
       success: true,
@@ -220,6 +285,11 @@ exports.registerVendor = async (req, res, next) => {
         vendorId: vendor.vendorId,
         name: vendor.name,
         serviceType: vendor.serviceType,
+        location: {
+          city: vendor.city,
+          area: vendor.area,
+          coordinates: vendor.location.coordinates
+        },
         verified: vendor.verified,
         isActive: vendor.isActive,
         status: 'pending_approval'

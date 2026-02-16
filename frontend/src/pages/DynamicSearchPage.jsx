@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, MapPin, Sparkles, TrendingUp, Package, List } from 'lucide-react';
+import { Search, MapPin } from 'lucide-react';
 import { ServiceProvider, useService } from '../contexts/ServiceContext';
 import DynamicFilterPanel from '../components/DynamicFilterPanel';
 import LocationFilters from '../components/LocationFilters';
@@ -41,6 +41,8 @@ const DynamicSearchPageContent = () => {
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('solutions'); // solutions | vendors
   const [sortBy, setSortBy] = useState('relevance');
+  const [tierBreakdown, setTierBreakdown] = useState(null);
+  const [searchMetadata, setSearchMetadata] = useState(null);
 
   // Detect service when query changes
   useEffect(() => {
@@ -80,6 +82,8 @@ const DynamicSearchPageContent = () => {
       // Use only database-driven results - no mock data fallback
       const vendorsList = response.vendors || [];
       setResults(vendorsList);
+      setTierBreakdown(response.tierBreakdown || null);
+      setSearchMetadata(response.metadata || null);
     } catch (error) {
       console.error('❌ Search error:', error);
       // Show empty state on error - no mock data
@@ -106,6 +110,146 @@ const DynamicSearchPageContent = () => {
     // Filters are already updated in context
     // Just trigger search
     executeSearch();
+  };
+
+  // Group vendors by tier - Strict Priority Order
+  const groupVendorsByTier = () => {
+    // If no results, return empty array
+    if (!results || results.length === 0) {
+      return [];
+    }
+
+    const groups = {
+      exact_area: { 
+        vendors: [], 
+        title: 'Same Area Vendors', 
+        subtitle: 'In Your Area',
+        icon: '👑', 
+        color: 'indigo', 
+        description: `Located exactly in ${filterValues.area || 'your selected area'} and highly rated`,
+        priority: 1
+      },
+      nearby: { 
+        vendors: [], 
+        title: 'Nearby Vendors', 
+        subtitle: 'Nearby',
+        icon: '🔵', 
+        color: 'blue', 
+        description: `Vendors near ${filterValues.area || filterValues.city || 'your location'}`,
+        priority: 2
+      },
+      same_city: { 
+        vendors: [], 
+        title: 'Same City – Other Areas', 
+        subtitle: filterValues.city || 'Same City',
+        icon: '🔵', 
+        color: 'purple', 
+        description: `Other vendors in ${filterValues.city || 'the same city'}`,
+        priority: 3
+      },
+      adjacent_city: { 
+        vendors: [], 
+        title: 'Nearby Cities Vendors', 
+        subtitle: 'Nearby Cities',
+        icon: '🔵', 
+        color: 'green', 
+        description: 'Vendors from nearby cities within practical distance',
+        priority: 4
+      },
+      all: {
+        vendors: [],
+        title: 'All Vendors',
+        subtitle: 'Available Vendors',
+        icon: '🔵',
+        color: 'indigo',
+        description: 'Browse all available vendors for your event',
+        priority: 5
+      }
+    };
+
+    results.forEach(vendor => {
+      const tier = vendor.matchTier || 'all'; // Default to 'all' if no tier
+      if (groups[tier]) {
+        groups[tier].vendors.push(vendor);
+      } else {
+        // Fallback to 'all' group if tier doesn't exist
+        groups.all.vendors.push(vendor);
+      }
+    });
+
+    // Filter out empty groups and return in strict priority order
+    return Object.entries(groups)
+      .filter(([_, group]) => group.vendors.length > 0)
+      .sort((a, b) => a[1].priority - b[1].priority)
+      .map(([tier, group]) => ({ tier, ...group }));
+  };
+
+  // Section Header Component - Exact Reference Image Style
+  const SectionHeader = ({ title, subtitle, icon, color, description, count, priority }) => {
+    // Emoji icons for each priority level
+    const emojiIcons = {
+      1: '👑',  // Crown for top vendors
+      2: '🔵',  // Blue circle for nearby
+      3: '🔵',  // Blue circle for more in city
+      4: '🔵'   // Blue circle for nearby cities
+    };
+
+    const displayIcon = icon || emojiIcons[priority] || '🔵';
+
+    // Distance filter options for "More Vendors" and "Nearby Cities" sections
+    const showDistanceFilters = priority === 3 || priority === 4;
+    const distanceOptions = ['5 km', '10 km', '25 km', '50 km'];
+
+    return (
+      <div className="mb-6">
+        {/* Main Header Row */}
+        <div className="flex items-center justify-between gap-4 mb-3">
+          {/* Left: Icon + Title + Badge */}
+          <div className="flex items-center gap-3">
+            {/* Circular Icon Background */}
+            <div className={`
+              w-10 h-10 rounded-full flex items-center justify-center text-xl
+              ${priority === 1 ? 'bg-purple-100' : 'bg-blue-100'}
+            `}>
+              {displayIcon}
+            </div>
+            
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+                
+                {/* Top Rated Badge */}
+                {priority === 1 && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
+                    <span>⚡</span>
+                    <span>Top Rated</span>
+                  </span>
+                )}
+              </div>
+              
+              {/* Subtitle/Description */}
+              <p className="text-sm text-gray-600 mt-0.5">
+                {description}
+              </p>
+            </div>
+          </div>
+
+          {/* Right: Distance Filter Buttons */}
+          {showDistanceFilters && (
+            <div className="flex items-center gap-2">
+              {distanceOptions.map((distance) => (
+                <button
+                  key={distance}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                >
+                  {distance}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -314,9 +458,36 @@ const DynamicSearchPageContent = () => {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {results.map((vendor, idx) => (
-                  <VendorCard key={vendor._id || idx} vendor={vendor} />
+              /* Tier-based Results Display - Reference Image Style */
+              <div className="space-y-10">
+                {groupVendorsByTier().map((group, index) => (
+                  <div 
+                    key={group.tier}
+                    className={`
+                      ${index > 0 ? 'pt-6' : ''}
+                    `}
+                  >
+                    <SectionHeader 
+                      title={group.title}
+                      subtitle={group.subtitle}
+                      icon={group.icon}
+                      color={group.color}
+                      description={group.description}
+                      count={group.vendors.length}
+                      priority={group.priority}
+                    />
+                    
+                    {/* Vendor Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                      {group.vendors.map((vendor, idx) => (
+                        <VendorCard 
+                          key={vendor._id || idx} 
+                          vendor={vendor}
+                          sectionLabel={group.subtitle}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

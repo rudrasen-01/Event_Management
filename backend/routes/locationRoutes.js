@@ -49,6 +49,14 @@ router.get('/cities/:cityId/areas', locationController.getAreasByCity);
  */
 router.get('/cities/osm/:osmId/areas', locationController.getAreasByOsmId);
 
+/**
+ * @route   GET /api/locations/cities/name/:cityName/areas
+ * @desc    Get all areas for a city by NAME (for frontend dropdown)
+ * @query   limit - max results (default 200)
+ * @example /api/locations/cities/name/Delhi/areas
+ */
+router.get('/cities/name/:cityName/areas', locationController.getAreasByCityName);
+
 // ============================================================================
 // AREA ROUTES
 // ============================================================================

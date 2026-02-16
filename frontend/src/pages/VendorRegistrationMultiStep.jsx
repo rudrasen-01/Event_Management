@@ -35,6 +35,9 @@ const VendorRegistrationMultiStep = () => {
   const [cities, setCities] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [citiesLoading, setCitiesLoading] = useState(true);
+  
+  // Field-level errors for better UX
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const totalSteps = 7;
 
@@ -196,7 +199,21 @@ const VendorRegistrationMultiStep = () => {
   }, []);
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    console.log(`✏️ Field Changed: ${field} = "${value}" (type: ${typeof value})`);
+    
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      console.log(`   Updated formData.${field}:`, updated[field]);
+      return updated;
+    });
+    
+    // Clear field-specific error when user types
+    if (fieldErrors[field]) {
+      console.log(`   Clearing error for field: ${field}`);
+      setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    // Clear general error
     setError('');
   };
 
@@ -210,57 +227,165 @@ const VendorRegistrationMultiStep = () => {
   };
 
   const validateStep = (step) => {
+    console.log('\n🔍 ========== VALIDATION START ==========');
+    console.log('Current Step:', step);
+    console.log('Form Data:', formData);
+    
+    // Clear previous field errors
+    setFieldErrors({});
+    
     switch (step) {
       case 1:
-        if (!formData.serviceType && !formData.customService.trim()) return 'Please select or enter a business category';
+        if (!formData.serviceType && !formData.customService.trim()) {
+          setFieldErrors({ serviceType: 'Please select or enter a business category' });
+          return 'Please select or enter a business category';
+        }
         break;
+        
       case 2:
-        if (!formData.businessName.trim()) return 'Business name is required';
-        if (!formData.city) return 'Please select your city';
-        if (!formData.area.trim() && !formData.street.trim()) return 'Please enter area or street';
+        console.log('\n📋 Step 2 Validation Details:');
+        console.log('  businessName:', `"${formData.businessName}"`, '(length:', formData.businessName?.length, ')');
+        console.log('  city:', `"${formData.city}"`, '(type:', typeof formData.city, ')');
+        console.log('  pincode:', `"${formData.pincode}"`, '(length:', formData.pincode?.length, ')');
+        console.log('  area:', `"${formData.area}"`, '(length:', formData.area?.length, ')');
+        console.log('  street:', `"${formData.street}"`, '(length:', formData.street?.length, ')');
+        console.log('  cities available:', cities.length);
+        
+        const step2Errors = {};
+        
+        // Business Name - Required
+        const businessNameValue = String(formData.businessName || '').trim();
+        if (!businessNameValue) {
+          console.log('  ❌ Business name is empty');
+          step2Errors.businessName = 'Business name is required';
+        } else {
+          console.log('  ✓ Business name OK');
+        }
+        
+        // City - Required
+        const cityValue = String(formData.city || '').trim();
+        if (!cityValue) {
+          console.log('  ❌ City is empty');
+          step2Errors.city = 'Please select your city';
+        } else {
+          console.log('  ✓ City OK:', cityValue);
+        }
+        
+        // Pincode - Required and must be 6 digits
+        const pincodeValue = String(formData.pincode || '').trim();
+        if (!pincodeValue) {
+          console.log('  ❌ Pincode is empty');
+          step2Errors.pincode = 'Pincode is required';
+        } else if (!/^\d{6}$/.test(pincodeValue)) {
+          console.log('  ❌ Pincode invalid format:', pincodeValue);
+          step2Errors.pincode = 'Enter valid 6-digit pincode';
+        } else {
+          console.log('  ✓ Pincode OK:', pincodeValue);
+        }
+        
+        // Area OR Street - at least one required
+        const areaValue = String(formData.area || '').trim();
+        const streetValue = String(formData.street || '').trim();
+        
+        if (!areaValue && !streetValue) {
+          console.log('  ❌ Both area and street are empty');
+          step2Errors.area = 'Please enter area or street';
+          step2Errors.street = 'Please enter area or street';
+        } else {
+          console.log('  ✓ Area/Street OK - Area:', areaValue, 'Street:', streetValue);
+        }
+        
+        if (Object.keys(step2Errors).length > 0) {
+          console.error('\n❌ Step 2 Validation FAILED!');
+          console.error('Errors:', step2Errors);
+          console.log('========== VALIDATION END ==========\n');
+          setFieldErrors(step2Errors);
+          return Object.values(step2Errors)[0];
+        }
+        
+        console.log('\n✅ Step 2 Validation PASSED!');
+        console.log('========== VALIDATION END ==========\n');
         break;
       case 3:
-        if (formData.workingDays.length === 0) return 'Select at least one working day';
+        if (formData.workingDays.length === 0) {
+          setFieldErrors({ workingDays: 'Select at least one working day' });
+          return 'Select at least one working day';
+        }
         break;
       case 4:
-        if (!formData.contactPerson.trim()) return 'Contact person name is required';
+        const step4Errors = {};
+        
+        if (!formData.contactPerson.trim()) {
+          step4Errors.contactPerson = 'Contact person name is required';
+        }
+        
         const phoneDigits = formData.phone.replace(/\D/g, '');
         if (phoneDigits.length !== 10 || !/^[6-9]/.test(phoneDigits)) {
-          return 'Enter valid 10-digit mobile number';
+          step4Errors.phone = 'Enter valid 10-digit mobile number';
         }
+        
         if (!formData.email || !/^\S+@\S+\.\S+$/.test(formData.email)) {
-          return 'Enter valid email address';
+          step4Errors.email = 'Enter valid email address';
         }
+        
         if (!formData.password || formData.password.length < 6) {
-          return 'Password must be at least 6 characters';
+          step4Errors.password = 'Password must be at least 6 characters';
         }
+        
         if (formData.password !== formData.confirmPassword) {
-          return 'Passwords do not match';
+          step4Errors.confirmPassword = 'Passwords do not match';
+        }
+        
+        if (Object.keys(step4Errors).length > 0) {
+          setFieldErrors(step4Errors);
+          return Object.values(step4Errors)[0];
         }
         break;
       case 5:
         break;
       case 6:
         // Plan selection validation - Free plan is always valid
-        if (!formData.selectedPlan) return 'Please select a visibility plan';
+        if (!formData.selectedPlan) {
+          setFieldErrors({ selectedPlan: 'Please select a visibility plan' });
+          return 'Please select a visibility plan';
+        }
         break;
       case 7:
-        if (!formData.minPrice || !formData.maxPrice) return 'Enter your pricing range';
-        if (Number(formData.minPrice) >= Number(formData.maxPrice)) return 'Max price must be greater than min';
-        if (Number(formData.minPrice) < 100) return 'Minimum price seems too low';
+        const step7Errors = {};
+        
+        if (!formData.minPrice || !formData.maxPrice) {
+          step7Errors.pricing = 'Enter your pricing range';
+        } else if (Number(formData.minPrice) >= Number(formData.maxPrice)) {
+          step7Errors.maxPrice = 'Max price must be greater than min';
+        } else if (Number(formData.minPrice) < 100) {
+          step7Errors.minPrice = 'Minimum price seems too low';
+        }
+        
+        if (Object.keys(step7Errors).length > 0) {
+          setFieldErrors(step7Errors);
+          return Object.values(step7Errors)[0];
+        }
         break;
     }
     return null;
   };
 
   const nextStep = () => {
+    console.log('\n🚀 Next Step Button Clicked');
+    console.log('Current Step:', currentStep);
+    
     const validationError = validateStep(currentStep);
+    
     if (validationError) {
+      console.log('⛔ Blocking step advancement due to validation error');
       setError(validationError);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    
+    console.log('✅ Advancing to step', currentStep + 1);
     setError('');
+    
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -269,10 +394,24 @@ const VendorRegistrationMultiStep = () => {
 
   const prevStep = () => {
     setError('');
+    setFieldErrors({});
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+  
+  // Helper function to get input CSS classes with error styling
+  const getInputClass = (fieldName, baseClass = 'w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none') => {
+    return fieldErrors[fieldName] 
+      ? `${baseClass} border-red-500 bg-red-50` 
+      : baseClass;
+  };
+  
+  // Helper to show field error message
+  const FieldError = ({ fieldName }) => {
+    if (!fieldErrors[fieldName]) return null;
+    return <p className="text-red-600 text-sm mt-1">{fieldErrors[fieldName]}</p>;
   };
 
   const handleReset = () => {
@@ -594,14 +733,20 @@ const VendorRegistrationMultiStep = () => {
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          {/* Error Message */}
-          {error && (
-            <div className="mx-6 mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
-              {error}
+        {/* Error Message - Sticky at top */}
+        {error && (
+          <div className="sticky top-0 z-50 mb-4 bg-red-100 border-l-4 border-red-500 text-red-800 px-6 py-4 rounded shadow-lg">
+            <div className="flex items-start">
+              <span className="text-2xl mr-3">⚠️</span>
+              <div className="flex-1">
+                <p className="font-semibold text-base">{error}</p>
+                <p className="text-sm mt-1">Please fill the required fields correctly before proceeding.</p>
+              </div>
             </div>
-          )}
-
+          </div>
+        )}
+        
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="p-6">
             {/* Step 1: Business Category */}
             {currentStep === 1 && (
@@ -784,9 +929,46 @@ const VendorRegistrationMultiStep = () => {
             {/* Step 2: Business Details */}
             {currentStep === 2 && (
               <div className="space-y-6">
+                {/* Debug Info - Remove in production */}
+                <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono">
+                  <div className="font-bold mb-2">🔍 Debug Info (Remove in production):</div>
+                  <div>businessName: "{formData.businessName}" ({formData.businessName?.length} chars)</div>
+                  <div>city: "{formData.city}" (type: {typeof formData.city})</div>
+                  <div>pincode: "{formData.pincode}" ({formData.pincode?.length} chars)</div>
+                  <div>area: "{formData.area}" ({formData.area?.length} chars)</div>
+                  <div>street: "{formData.street}" ({formData.street?.length} chars)</div>
+                  <div>Cities loaded: {cities.length}</div>
+                  <div className="mt-2 text-blue-600">Open browser console (F12) for detailed logs</div>
+                </div>
+                
                 <div>
                   <h2 className="text-lg font-bold text-gray-900 mb-1">Business Details</h2>
-                  <p className="text-sm text-gray-600">Tell us about your business location</p>
+                  <p className="text-sm text-gray-600">
+                    Tell us about your business location. 
+                    <span className="text-red-500 font-medium"> * Required fields</span>
+                  </p>
+                  
+                  {/* Field Completion Tracker */}
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className={`px-2 py-1 rounded ${formData.businessName?.trim() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {formData.businessName?.trim() ? '✓' : '○'} Business Name
+                    </span>
+                    <span className={`px-2 py-1 rounded ${formData.city?.trim() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {formData.city?.trim() ? '✓' : '○'} City
+                    </span>
+                    <span className={`px-2 py-1 rounded ${formData.pincode?.trim() && /^\d{6}$/.test(formData.pincode) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {formData.pincode?.trim() && /^\d{6}$/.test(formData.pincode) ? '✓' : '○'} Pincode
+                    </span>
+                    <span className={`px-2 py-1 rounded ${(formData.area?.trim() || formData.street?.trim()) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {(formData.area?.trim() || formData.street?.trim()) ? '✓' : '○'} Area/Street
+                    </span>
+                  </div>
+                  
+                  {Object.keys(fieldErrors).length > 0 && (
+                    <div className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded border border-red-200">
+                      ⚠️ {Object.keys(fieldErrors).length} field(s) need attention
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -799,9 +981,10 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.businessName}
                       onChange={(e) => handleChange('businessName', e.target.value)}
                       placeholder="Enter your business name"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('businessName', 
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="businessName" />
                   </div>
 
                   <div>
@@ -812,8 +995,8 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.city}
                       onChange={(e) => handleChange('city', e.target.value)}
                       disabled={citiesLoading}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('city',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     >
                       <option value="">
                         {citiesLoading 
@@ -832,12 +1015,13 @@ const VendorRegistrationMultiStep = () => {
                         !citiesLoading && <option value="" disabled>No cities found</option>
                       )}
                     </select>
-                    {!citiesLoading && cities.length === 0 && (
+                    <FieldError fieldName="city" />
+                    {!citiesLoading && cities.length === 0 && !fieldErrors.city && (
                       <p className="text-xs text-red-600 mt-1">
                         ⚠️ No cities loaded. Please refresh the page.
                       </p>
                     )}
-                    {cities.length > 0 && (
+                    {cities.length > 0 && !fieldErrors.city && (
                       <p className="text-xs text-gray-500 mt-1">
                         {cities.length} cities available
                       </p>
@@ -846,17 +1030,21 @@ const VendorRegistrationMultiStep = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Pincode
+                      Pincode <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={formData.pincode}
-                      onChange={(e) => handleChange('pincode', e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, ''); // Only digits
+                        if (value.length <= 6) handleChange('pincode', value);
+                      }}
                       placeholder="452001"
                       maxLength="6"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('pincode',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="pincode" />
                   </div>
 
                   <div>
@@ -896,9 +1084,13 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.street}
                       onChange={(e) => handleChange('street', e.target.value)}
                       placeholder="Street name"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('street',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="street" />
+                    {!fieldErrors.street && (
+                      <p className="text-xs text-gray-500 mt-1">Fill either Street or Area/Locality (at least one required)</p>
+                    )}
                   </div>
 
                   <div>
@@ -910,9 +1102,10 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.area}
                       onChange={(e) => handleChange('area', e.target.value)}
                       placeholder="e.g., Vijay Nagar"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('area',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="area" />
                   </div>
 
                   <div>

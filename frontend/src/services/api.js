@@ -124,7 +124,9 @@ export const fetchVendors = async (filters = {}) => {
     
     return {
       vendors: response.success ? response.data.results : [],
-      total: response.success ? response.data.total : 0
+      total: response.success ? response.data.total : 0,
+      tierBreakdown: response.success ? response.data.searchQuality?.tierBreakdown : null,
+      metadata: response.success ? response.data.metadata : null
     };
   } catch (error) {
     console.error('❌ Error fetching vendors:', error);

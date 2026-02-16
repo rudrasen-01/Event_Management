@@ -102,6 +102,104 @@ Admin Panel → GET /api/admin/* → Fetch from MongoDB → Display in UI
 
 ---
 
+## Geo-Location Scripts
+
+These scripts populate location data (cities and areas) from OpenStreetMap for geo-based vendor search.
+
+### `populate-indore-areas.js`
+Populates all areas/localities of Indore from OpenStreetMap
+```bash
+node scripts/populate-indore-areas.js
+```
+**What it does:**
+- Fetches all suburbs, neighbourhoods, and localities in Indore from OpenStreetMap
+- Inserts unique areas into the Area collection
+- Updates the City document with area count
+- Skips duplicates automatically
+
+**Output:** Comprehensive area coverage for Indore with geo-coordinates for radius-based search.
+
+### `populate-mp-areas.js`
+Populates areas for all major Madhya Pradesh cities
+```bash
+node scripts/populate-mp-areas.js
+```
+
+### `populate-delhi-areas-manual.js`
+Populates manually curated popular areas for Delhi NCR cities
+```bash
+node scripts/populate-delhi-areas-manual.js
+```
+
+### `populate-indore-areas-manual.js`
+Populates 75+ manually curated areas of Indore with accurate coordinates
+```bash
+node scripts/populate-indore-areas-manual.js
+```
+**What it does:**
+- Inserts 75+ verified Indore localities with accurate lat/lon coordinates
+- Covers major areas: Vijay Nagar, Palasia, MG Road, AB Road, etc.
+- Ensures precise geospatial search capability
+
+**Output:** 76 total Indore areas with verified coordinates for distance-based search.
+
+### `populate-delhi-ncr-areas-comprehensive.js` - **RECOMMENDED FOR DELHI NCR**
+Populates comprehensive areas across entire Delhi NCR region
+```bash
+node scripts/populate-delhi-ncr-areas-comprehensive.js
+```
+**Coverage:**
+- Delhi: 134 areas
+- New Delhi: 12 areas  
+- Noida: 14 areas
+- Greater Noida: 15 areas
+- Ghaziabad: 10 areas
+- Gurgaon (Gurugram): 18 areas
+- Faridabad: 11 areas
+- Sonipat: 6 areas
+- Bahadurgarh: 5 areas
+
+**Total:** 225 areas with standardized lat/lon coordinates for entire NCR.
+
+### Other geo-location utilities:
+- `check-states.js` - Verify states in database
+- `check-delhi-cities.js` - Check Delhi NCR cities
+- `check-mp-cities.js` - Check MP cities
+- `find-mp-cities.js` - Find and list MP cities
+- `test-geo-location-system.js` - Test geo-location search functionality
+- `add-indore-city.js` - Add/verify Indore city in database
+
+---
+
+## Testing Scripts
+
+### `test-unified-search.js` - **COMPREHENSIVE SEARCH TESTING**
+Tests the unified vendor search system with 18 comprehensive test scenarios
+```bash
+node scripts/test-unified-search.js
+```
+
+**What it tests:**
+- ✅ Four-tier priority ordering (Exact Area → Nearby → Same City → Adjacent City)
+- ✅ Location resolution strategies (coordinates, areaId, city+area, city center)
+- ✅ Budget filtering (strict mode for nearby, flexible ±20% for distant)
+- ✅ Radius-based geospatial search with distance calculations
+- ✅ Service type, verified, rating, and text query filters
+- ✅ Pagination functionality
+- ✅ Combined filter interactions
+- ✅ Zero-result prevention with adjacent city inclusion
+- ✅ Haversine distance calculation accuracy
+- ✅ Response format and metadata validation
+
+**Prerequisites:**
+- Database must have cities and areas populated
+- At least one city with areas (Delhi or Indore recommended)
+- Some vendors in the database (for meaningful results)
+
+**Output:** Detailed test report with pass/fail status for each scenario, search quality metrics, and tier breakdown analysis.
+
+---
+
 ## Quick Commands
 
 ```bash
@@ -114,4 +212,13 @@ node scripts/check-db.js
 # Seed only if needed for testing
 npm run seed:vendors:win
 npm run seed:inquiries:win
+
+# Test unified search system
+node scripts/test-unified-search.js
+
+# Populate Delhi NCR areas (recommended)
+node scripts/populate-delhi-ncr-areas-comprehensive.js
+
+# Populate Indore areas
+node scripts/populate-indore-areas-manual.js
 ```

@@ -4,6 +4,7 @@ import { Menu, X, ChevronDown, User as UserIcon, LogOut, Settings, LayoutDashboa
 import VendorLoginModal from './VendorLoginModal';
 import UserLoginModal from './UserLoginModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useVendorAuth } from '../contexts/VendorAuthContext';
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -15,11 +16,11 @@ const Header = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, isAdmin } = useAuth();
+  const { vendor, vendorToken, setVendor, setVendorToken } = useVendorAuth();
   
   // Check if vendor is logged in
-  const vendorToken = localStorage.getItem('vendorToken');
-  const vendorBusinessName = localStorage.getItem('vendorBusinessName');
-  const isVendor = !!vendorToken;
+  const isVendor = !!vendor && !!vendorToken;
+  const vendorBusinessName = vendor?.businessName || localStorage.getItem('vendorBusinessName');
 
   // Handle scroll effect
   useEffect(() => {
@@ -52,7 +53,15 @@ const Header = () => {
     setMobileMenuOpen(false);
   };
 
-  const handleLoginSuccess = (vendor) => {
+  const handleLoginSuccess = (vendorData) => {
+    // Get the token from localStorage (VendorLoginModal stored it)
+    const token = localStorage.getItem('vendorToken') || localStorage.getItem('authToken');
+    
+    // Update VendorAuthContext state
+    setVendor(vendorData);
+    setVendorToken(token);
+    
+    // Navigate to vendor dashboard
     navigate('/vendor-dashboard');
   };
 
@@ -69,10 +78,19 @@ const Header = () => {
   };
 
   const handleVendorLogout = () => {
+    // Clear localStorage
     localStorage.removeItem('vendorToken');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('vendorId');
     localStorage.removeItem('vendorEmail');
     localStorage.removeItem('vendorBusinessName');
+    localStorage.removeItem('vendorData');
+    localStorage.removeItem('userRole');
+    
+    // Update VendorAuthContext state
+    setVendor(null);
+    setVendorToken(null);
+    
     setShowVendorMenu(false);
     setMobileMenuOpen(false);
     navigate('/');

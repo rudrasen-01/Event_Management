@@ -375,4 +375,67 @@ exports.getAreasByOsmId = async (req, res) => {
   }
 };
 
+/**
+ * @route   GET /api/locations/cities/name/:cityName/areas
+ * @desc    Get all areas for a city by NAME (for frontend dropdown)
+ * @access  Public
+ * @example /api/locations/cities/name/Delhi/areas
+ */
+exports.getAreasByCityName = async (req, res) => {
+  try {
+    const { cityName } = req.params;
+    const { limit = 200 } = req.query; // Default 200 areas
+    
+    // Find city by name (case-insensitive)
+    const city = await City.findOne({ 
+      name: new RegExp(`^${cityName}$`, 'i')
+    });
+    
+    if (!city) {
+      return res.status(404).json({
+        success: false,
+        message: `City "${cityName}" not found`
+      });
+    }
+    
+    // Get areas for this city
+    const areas = await Area.find({ city_id: city._id })
+      .sort({ name: 1 })
+      .limit(parseInt(limit))
+      .select('_id name normalizedName placeType lat lon location vendorCount');
+    
+    const total = await Area.countDocuments({ city_id: city._id });
+    
+    res.json({
+      success: true,
+      count: areas.length,
+      total,
+      city: {
+        id: city._id,
+        name: city.name,
+        state: city.state,
+        lat: city.lat,
+        lon: city.lon
+      },
+      data: areas.map(area => ({
+        id: area._id,
+        name: area.name,
+        placeType: area.placeType,
+        lat: area.lat,
+        lon: area.lon,
+        coordinates: area.location.coordinates,
+        vendorCount: area.vendorCount || 0
+      }))
+    });
+    
+  } catch (error) {
+    console.error('Error getting areas by city name:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get areas',
+      error: error.message
+    });
+  }
+};
+
 module.exports = exports;

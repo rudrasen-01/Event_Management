@@ -263,6 +263,13 @@ const vendorSchema = new mongoose.Schema({
   // Search Optimization
   searchKeywords: [String],
   
+  // Location Keywords (for fuzzy location matching)
+  locationKeywords: {
+    type: [String],
+    default: [],
+    index: true
+  },
+  
   popularityScore: {
     type: Number,
     default: 0,
@@ -545,6 +552,39 @@ vendorSchema.pre('save', async function(next) {
     if (this.area) keywords.add(this.area.toLowerCase());
     
     this.searchKeywords = Array.from(keywords);
+  }
+  
+  // 3. Auto-populate locationKeywords from location fields
+  if (this.isModified('city') || this.isModified('area') || this.isModified('pincode') || this.isModified('address')) {
+    const locationKeywords = new Set();
+    
+    if (this.city) {
+      locationKeywords.add(this.city.toLowerCase().trim());
+    }
+    
+    if (this.area) {
+      locationKeywords.add(this.area.toLowerCase().trim());
+      // Add area parts (e.g., "Sector 62" => ["sector", "62"])
+      const areaParts = this.area.toLowerCase().split(/\s+/);
+      areaParts.forEach(part => {
+        if (part.length > 1) locationKeywords.add(part);
+      });
+    }
+    
+    if (this.pincode) {
+      locationKeywords.add(this.pincode.trim());
+    }
+    
+    // Extract landmark/area from address
+    if (this.address) {
+      const addressParts = this.address.toLowerCase()
+        .split(/[,\n]+/)
+        .map(part => part.trim())
+        .filter(part => part.length > 2 && part.length < 30);
+      addressParts.forEach(part => locationKeywords.add(part));
+    }
+    
+    this.locationKeywords = Array.from(locationKeywords);
   }
   
   next();

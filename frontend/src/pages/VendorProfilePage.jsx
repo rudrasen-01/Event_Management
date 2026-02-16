@@ -6,7 +6,7 @@ import {
   Heart, Share2, Send, Play, ExternalLink, Clock, AlertTriangle,
   X, Check, Building2, Users, TrendingUp, Shield
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../services/api';
 import InquiryModal from '../components/InquiryModal';
 
 /**
@@ -36,16 +36,16 @@ const VendorProfilePage = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`/api/vendor-profile/${vendorId}`);
+      const response = await apiClient.get(`/vendor-profile/${vendorId}`);
       
-      if (response.data.success && response.data.data) {
-        setProfile(response.data.data);
+      if (response.success && response.data) {
+        setProfile(response.data);
       } else {
         setError('Vendor profile not found');
       }
     } catch (err) {
       console.error('Fetch profile error:', err);
-      setError(err.response?.data?.message || 'Failed to load vendor profile');
+      setError(err.message || 'Failed to load vendor profile');
     } finally {
       setLoading(false);
     }
@@ -97,7 +97,34 @@ const VendorProfilePage = () => {
     );
   }
 
-  const { vendor, media, blogs, videos, reviews, stats } = profile;
+  // Safely destructure profile data with defaults
+  const { 
+    vendor = {}, 
+    media = [], 
+    blogs = [], 
+    videos = [], 
+    reviews = [], 
+    stats = {} 
+  } = profile || {};
+
+  // Additional safety check for vendor data
+  if (!vendor || !vendor.businessName) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Profile</h2>
+          <p className="text-gray-600 mb-6">This vendor profile could not be loaded. Please try again later.</p>
+          <button
+            onClick={() => navigate('/search')}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            Browse Vendors
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -114,7 +141,7 @@ const VendorProfilePage = () => {
             {/* Profile Picture / Logo */}
             <div className="flex-shrink-0 -mt-16 md:-mt-20">
               <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-5xl md:text-6xl font-bold shadow-2xl border-4 border-white">
-                {vendor.businessName.charAt(0).toUpperCase()}
+                {vendor.businessName?.charAt(0).toUpperCase() || 'V'}
               </div>
             </div>
 
@@ -124,7 +151,7 @@ const VendorProfilePage = () => {
                 <div>
                   <div className="flex items-center flex-wrap gap-2 mb-2">
                     <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                      {vendor.businessName}
+                      {vendor.businessName || 'Vendor'}
                     </h1>
                     {vendor.verified && (
                       <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
@@ -140,13 +167,17 @@ const VendorProfilePage = () => {
                     )}
                   </div>
 
-                  <p className="text-lg text-gray-600 mb-3 capitalize">{vendor.serviceType.replace(/-/g, ' ')}</p>
+                  <p className="text-lg text-gray-600 mb-3 capitalize">
+                    {vendor.serviceType?.replace(/-/g, ' ') || 'Event Service'}
+                  </p>
 
                   {/* Location & Experience */}
                   <div className="flex flex-wrap gap-4 mb-3">
                     <div className="flex items-center gap-2 text-gray-600">
                       <MapPin className="w-5 h-5 text-indigo-600" />
-                      <span className="font-medium">{vendor.area ? `${vendor.area}, ${vendor.city}` : vendor.city}</span>
+                      <span className="font-medium">
+                        {vendor.area && vendor.city ? `${vendor.area}, ${vendor.city}` : vendor.city || 'Location Available'}
+                      </span>
                     </div>
                     {vendor.yearsInBusiness > 0 && (
                       <div className="flex items-center gap-2 text-gray-600">

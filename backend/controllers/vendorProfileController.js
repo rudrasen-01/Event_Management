@@ -87,7 +87,7 @@ exports.getVendorProfile = async (req, res) => {
     const profile = {
       vendor: {
         id: vendor._id,
-        businessName: vendor.businessName,
+        businessName: vendor.businessName || vendor.name, // Fallback to name if businessName is empty
         ownerName: vendor.name,
         serviceType: vendor.serviceType,
         city: vendor.city,
@@ -96,7 +96,7 @@ exports.getVendorProfile = async (req, res) => {
         verified: vendor.verified,
         rating: avgRating.toFixed(1),
         totalReviews: reviews.length,
-        yearsInBusiness: vendor.yearsInBusiness,
+        yearsInBusiness: vendor.yearsInBusiness || 0,
         contact: vendor.contact,
         pricing: vendor.pricing,
         planType: vendor.planType || 'free'
