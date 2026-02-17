@@ -111,6 +111,9 @@ const FilterPanel = ({ onFilter, userLocation }) => {
 
   // Handle search
   const handleSearch = () => {
+    console.log('🔍 FilterPanel: Searching with filters:', filters);
+    console.log('🔍 FilterPanel: User location:', userLocation);
+    
     onFilter({
       ...filters,
       latitude: userLocation?.latitude,

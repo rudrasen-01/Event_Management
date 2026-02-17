@@ -11,6 +11,7 @@ const {
 
 exports.searchVendors = async (req, res, next) => {
   try {
+    // Extract all possible filter parameters from request body
     const {
       serviceId,        // Service category (optional if using text search)
       query,            // Text search query (business name, contact person, keywords)
@@ -21,7 +22,15 @@ exports.searchVendors = async (req, res, next) => {
       rating,           // Minimum rating
       sort = 'relevance',
       page = 1,
-      limit = 20
+      limit = 20,
+      // Additional direct parameters (for backward compatibility)
+      city,
+      area,
+      latitude,
+      longitude,
+      radius,
+      budgetMin,
+      budgetMax
     } = req.body;
     
     // STEP 1: Normalize search query using taxonomy
@@ -70,17 +79,34 @@ exports.searchVendors = async (req, res, next) => {
     }
     
     // STEP 2: Prepare comprehensive search parameters
+    // Merge location object with direct parameters (direct params take precedence)
+    const locationData = location || {};
+    const finalLocation = {
+      city: city || locationData.city,
+      area: area || locationData.area,
+      latitude: latitude || locationData.latitude,
+      longitude: longitude || locationData.longitude,
+      radius: radius || locationData.radius || 10
+    };
+    
+    // Merge budget object with direct parameters (direct params take precedence)
+    const budgetData = budget || {};
+    const finalBudget = {
+      min: budgetMin || budgetData.min,
+      max: budgetMax || budgetData.max
+    };
+    
     const searchParams = {
       query: query?.trim() || '',              // Text search on business names
       serviceType: effectiveServiceId || undefined,     // Category filter (can be array)
-      location: location ? {
-        city: location.city,
-        area: location.area,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        radius: location.radius || 10
+      location: (finalLocation.city || finalLocation.area || (finalLocation.latitude && finalLocation.longitude)) ? {
+        city: finalLocation.city,
+        area: finalLocation.area,
+        latitude: finalLocation.latitude,
+        longitude: finalLocation.longitude,
+        radius: finalLocation.radius
       } : undefined,
-      budget: budget || undefined,
+      budget: (finalBudget.min || finalBudget.max) ? finalBudget : undefined,
       filters: filters || {},
       verified: verified !== undefined ? verified : undefined,  // Allow filtering by verified status
       rating: rating || undefined,
@@ -94,13 +120,14 @@ exports.searchVendors = async (req, res, next) => {
     // Calculate distance for each vendor (if geospatial search used)
     let resultsWithDistance = result.results || [];
     
-    if (location?.latitude && location?.longitude && location?.radius) {
+    const searchLocation = searchParams.location;
+    if (searchLocation?.latitude && searchLocation?.longitude && searchLocation?.radius) {
       resultsWithDistance = result.results.map(vendor => {
         const vendorLoc = vendor.location?.coordinates;
         if (vendorLoc && vendorLoc.length === 2) {
           const distance = calculateDistance(
-            location.latitude,
-            location.longitude,
+            searchLocation.latitude,
+            searchLocation.longitude,
             vendorLoc[1], // latitude
             vendorLoc[0]  // longitude
           );
@@ -137,8 +164,8 @@ exports.searchVendors = async (req, res, next) => {
         searchCriteria: {
           query: query || null,
           serviceType: serviceId || null,
-          location: location || null,
-          budget: budget || null,
+          location: searchParams.location || null,
+          budget: searchParams.budget || null,
           verified: verified !== undefined ? verified : null,
           rating: rating || null
         },
