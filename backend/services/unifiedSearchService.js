@@ -26,6 +26,7 @@ const mongoose = require('mongoose');
 const Vendor = require('../models/VendorNew');
 const Area = require('../models/Area');
 const City = require('../models/City');
+const semantic = require('./semanticService');
 
 // ============================================================================
 // CONFIGURATION CONSTANTS
@@ -499,6 +500,98 @@ class UnifiedVendorSearch {
   }
 
   /**
+   * FUZZY / ATLAS SEARCH: Use Atlas Search $search with fuzzy options when available
+   * Returns vendors matched by fuzzy text scoring (searchScore will be normalized)
+   */
+  async findFuzzyVendors(excludeIds = []) {
+    if (!this.params.query || this.params.query.trim().length === 0) return [];
+
+    try {
+      const shouldClauses = [
+        { text: { query: this.params.query, path: 'name', fuzzy: { maxEdits: 2, prefixLength: 1 } } },
+        { text: { query: this.params.query, path: 'businessName', fuzzy: { maxEdits: 2, prefixLength: 1 } } },
+        { text: { query: this.params.query, path: ['serviceType', 'searchKeywords'], fuzzy: { maxEdits: 2, prefixLength: 1 } } },
+        { text: { query: this.params.query, path: ['city', 'area'], fuzzy: { maxEdits: 1, prefixLength: 1 } } }
+      ];
+
+      const searchStage = {
+        $search: {
+          compound: {
+            should: shouldClauses,
+            minimumShouldMatch: 1
+          }
+        }
+      };
+
+      const matchStage = { $match: { isActive: true } };
+      if (excludeIds && excludeIds.length > 0) matchStage.$match._id = { $nin: excludeIds };
+      if (this.params.serviceType) matchStage.$match.serviceType = new RegExp(this.params.serviceType, 'i');
+      if (this.params.verified !== undefined) matchStage.$match.verified = this.params.verified;
+      if (this.params.rating !== undefined) matchStage.$match.rating = { $gte: this.params.rating };
+
+      const projectStage = { $project: {
+        score: { $meta: 'searchScore' },
+        name: 1,
+        businessName: 1,
+        serviceType: 1,
+        city: 1,
+        area: 1,
+        location: 1,
+        rating: 1,
+        verified: 1,
+        popularityScore: 1,
+        pricing: 1
+      }};
+
+      const limitStage = { $limit: SEARCH_CONFIG.MAX_RESULTS_PER_TIER.nearby };
+
+      const pipeline = [searchStage, matchStage, projectStage, limitStage];
+
+      const docs = await Vendor.collection.aggregate(pipeline).toArray();
+
+      // Normalize searchScore to 0..1 approximately
+      const maxScore = docs.reduce((m, d) => Math.max(m, d.score || 0), 0) || 1;
+
+      return docs.map(d => ({
+        ...d,
+        _id: d._id,
+        name: d.name || d.businessName,
+        matchTier: 'fuzzy',
+        tierPriority: 2,
+        similarityScore: Math.min(1, (d.score || 0) / maxScore)
+      }));
+    } catch (err) {
+      // $search not available or failed - silently continue with empty
+      console.warn('Atlas Search fuzzy lookup failed or not available:', err.message);
+
+      // Fallback: If a text index exists, use MongoDB $text search for reasonable relevance
+      try {
+        if (!this.params.query || this.params.query.trim().length === 0) return [];
+        const textDocs = await Vendor.find(
+          { $text: { $search: this.params.query }, isActive: true, _id: { $nin: excludeIds } },
+          { score: { $meta: 'textScore' }, name: 1, businessName: 1, serviceType: 1, city: 1, area: 1, location: 1, rating: 1, verified:1, popularityScore:1, pricing:1 }
+        )
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(SEARCH_CONFIG.MAX_RESULTS_PER_TIER.nearby)
+        .lean();
+
+        const maxScore = textDocs.reduce((m, d) => Math.max(m, d.score || 0), 0) || 1;
+        return textDocs.map(d => ({
+          ...d,
+          _id: d._id,
+          name: d.name || d.businessName,
+          matchTier: 'text',
+          tierPriority: 2,
+          similarityScore: Math.min(1, (d.score || 0) / maxScore)
+        }));
+      } catch (texterr) {
+        console.warn('Text-index fallback failed or not available:', texterr.message);
+        return [];
+      }
+    }
+  }
+
+  /**
    * Calculate distance between two coordinates (Haversine formula)
    */
   calculateDistance(lat1, lon1, lat2, lon2) {
@@ -557,6 +650,42 @@ class UnifiedVendorSearch {
       this.results.nearby = await this.findNearbyVendors(locationData.coordinates, allVendorIds);
       allVendorIds.push(...this.results.nearby.map(v => v._id));
       console.log(`   ✅ Tier 2 (Nearby): ${this.results.nearby.length} vendors`);
+    }
+
+    // FUZZY: Use Atlas Search fuzzy matching to augment results when query present
+    if (this.params.query && allVendorIds.length < SEARCH_CONFIG.MIN_RESULTS_THRESHOLD) {
+      const fuzzyResults = await this.findFuzzyVendors(allVendorIds);
+      if (fuzzyResults && fuzzyResults.length > 0) {
+        // Add fuzzy results (avoid duplicates)
+        const newFuzzy = fuzzyResults.filter(v => !allVendorIds.includes(v._id));
+        this.results.nearby.push(...newFuzzy);
+        allVendorIds.push(...newFuzzy.map(v => v._id));
+        console.log(`   ✅ Fuzzy results added: ${newFuzzy.length} vendors`);
+      }
+    }
+
+    // SEMANTIC: Use vector store as additional fallback/augmentation
+    if (this.params.query && allVendorIds.length < SEARCH_CONFIG.MIN_RESULTS_THRESHOLD) {
+      try {
+        const semanticMatches = await semantic.querySimilarVendors(this.params.query, 20);
+        if (semanticMatches && semanticMatches.length > 0) {
+          // Fetch vendor docs for top semantic IDs
+          const ids = semanticMatches.map(m => m.id);
+          const vendors = await Vendor.find({ _id: { $in: ids }, isActive: true }).lean();
+          // Attach semantic score and add to nearby if not duplicate
+          const newSemantic = vendors
+            .filter(v => !allVendorIds.includes(v._id))
+            .map(v => {
+              const m = semanticMatches.find(x => x.id === v._id.toString());
+              return { ...v, semanticScore: m ? m.score : 0, matchTier: 'semantic', tierPriority: 3 };
+            });
+          this.results.nearby.push(...newSemantic);
+          allVendorIds.push(...newSemantic.map(v => v._id));
+          console.log(`   ✅ Semantic results added: ${newSemantic.length} vendors`);
+        }
+      } catch (err) {
+        console.warn('Semantic augmentation failed:', err.message);
+      }
     }
 
     // Tier 3: Same City Vendors

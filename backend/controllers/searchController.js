@@ -90,57 +90,176 @@ exports.searchVendors = async (req, res, next) => {
     console.log(`   Page ${searchResult.page}/${searchResult.totalPages}`);
     console.log(`   Tier breakdown:`, searchResult.metadata.tierBreakdown);
     console.log('━'.repeat(70) + '\n');
-    
-    // STEP 5: Send response
+
+    // Build suggestions with similarity and composite scoring
+    const candidates = Array.isArray(searchResult.results) ? searchResult.results : [];
+
+    // Helper functions for scoring
+    const tokenize = str => (str || '').toString().toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+    const jaccard = (aTokens, bTokens) => {
+      const a = new Set(aTokens);
+      const b = new Set(bTokens);
+      if (a.size === 0 || b.size === 0) return 0;
+      const inter = [...a].filter(x => b.has(x)).length;
+      const uni = new Set([...a, ...b]).size;
+      return uni === 0 ? 0 : inter / uni;
+    };
+
+    const computeSimilarity = (queryText, vendor) => {
+      // Token overlap between query and vendor searchable fields
+      const qTokens = tokenize(queryText);
+      const nameTokens = tokenize(vendor.name || vendor.businessName || '');
+      const serviceTokens = tokenize(vendor.serviceType || '');
+      const locTokens = tokenize([vendor.city, vendor.area].filter(Boolean).join(' '));
+
+      const nameSim = jaccard(qTokens, nameTokens);
+      const serviceSim = jaccard(qTokens, serviceTokens);
+      const locSim = jaccard(qTokens, locTokens);
+
+      // Tier priority boost (if unifiedSearchService included tierPriority)
+      const tierBoost = vendor.tierPriority ? (1 / vendor.tierPriority) : 0;
+
+      // Combine into normalized similarity 0..1
+      const raw = Math.max(nameSim * 1.2, serviceSim * 1.1, locSim) + (tierBoost * 0.15);
+
+      // If semantic score present (from vector DB), fold it in
+      const semantic = vendor.semanticScore ? Math.tanh(vendor.semanticScore / 10) : 0; // normalize approx
+      const combined = Math.min(1, raw + (semantic * 0.25));
+      return combined;
+    };
+
+    const { weights: CONFIG_WEIGHTS, distanceScaleKm } = require('../config/searchWeights');
+
+    const computeCompositeScore = (vendor, similarity) => {
+      // Components normalized to 0..1
+      const rating = (vendor.rating || 0) / 5;
+      const verified = vendor.verified ? 1 : 0;
+      const popularity = Math.min(1, (vendor.popularityScore || 0) / 100);
+      const distanceKm = typeof vendor.distance === 'number' ? vendor.distance : (vendor.distanceKm || null);
+      const distanceScore = distanceKm !== null && distanceKm !== undefined ? (1 / (1 + (distanceKm / (distanceScaleKm || 5)))) : 0;
+
+      // include semantic score if present (normalize semanticScore or similarity)
+      const semantic = vendor.semanticScore ? Math.tanh(vendor.semanticScore / 10) : 0;
+
+      const weights = CONFIG_WEIGHTS;
+
+      const score = (weights.similarity * similarity)
+                  + (weights.semantic * semantic)
+                  + (weights.rating * rating)
+                  + (weights.distance * distanceScore)
+                  + (weights.verified * verified)
+                  + (weights.popularity * popularity);
+
+      return Math.round(score * 1000) / 1000; // 3 decimal places
+    };
+
+    // Annotate candidates
+    const annotated = candidates.map(v => {
+      const sim = computeSimilarity(searchParams.query || query || '', v);
+      const composite = computeCompositeScore(v, sim);
+      return {
+        ...v,
+        similarityScore: sim,
+        computedScore: composite
+      };
+    });
+
+    // Sort by composite score desc, then rating, then pop
+    annotated.sort((a, b) => {
+      if (b.computedScore !== a.computedScore) return b.computedScore - a.computedScore;
+      if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
+      return (b.popularityScore || 0) - (a.popularityScore || 0);
+    });
+
+    // If no candidates found, ensure fallback: fetch popular vendors in city or global
+    let finalCandidates = annotated;
+    if (finalCandidates.length === 0) {
+      console.log('   ⚠️ No candidates from unified search, fetching popular fallbacks');
+      const fallbackQuery = {};
+      if (searchParams.city) fallbackQuery.city = new RegExp(searchParams.city, 'i');
+      const fallbacks = await Vendor.find({ isActive: true, ...fallbackQuery })
+        .sort({ popularityScore: -1, rating: -1 })
+        .limit(10)
+        .select('-password -verificationDocuments')
+        .lean();
+
+      finalCandidates = fallbacks.map(v => ({
+        ...v,
+        similarityScore: computeSimilarity(searchParams.query || query || '', v),
+        computedScore: computeCompositeScore(v, computeSimilarity(searchParams.query || query || '', v))
+      }));
+    }
+
+    // Format suggestions per required response structure
+    const suggestions = finalCandidates.slice(0, 20).map(v => ({
+      id: v.vendorId || v._id,
+      name: v.name,
+      category: v.serviceType,
+      similarityScore: v.similarityScore,
+      rating: v.rating || 0,
+      distance: v.distance || v.distanceKm || null
+    }));
+
+    // Suggested keywords (use normalization service suggestions if available)
+    const suggestedKeywords = normalizedSearch && normalizedSearch.taxonomyMatches
+      ? (normalizedSearch.taxonomyMatches.services || []).slice(0,3).map(s => s.name)
+      : (await getSearchSuggestions(query || searchParams.query || '', 5)).map(s => s.label);
+
+    // exactMatchFound heuristics: any candidate with very high similarity or exact name match
+    const exactMatchFound = finalCandidates.some(v => (v.similarityScore >= 0.98) || ((v.name || '').toLowerCase() === (query || '').toLowerCase()));
+
+    const message = exactMatchFound ? 'Exact results' : 'No exact match found. Showing similar results.';
+
+    // Primary response object mandated by requirements
+    const responsePayload = {
+      query: query || searchParams.query || '',
+      exactMatchFound,
+      message,
+      suggestions,
+      suggestedKeywords
+    };
+
+    // Also keep legacy data for UI debug if needed
+    const legacy = {
+      total: searchResult.total,
+      page: searchResult.page,
+      limit: searchResult.limit,
+      totalPages: searchResult.totalPages,
+      hasNextPage: searchResult.hasNextPage,
+      hasPrevPage: searchResult.hasPrevPage,
+      searchQuality: {
+        tierBreakdown: searchResult.metadata.tierBreakdown,
+        priorityOrder: [
+          'Exact area match',
+          'Nearby vendors',
+          'Same city vendors',
+          'Adjacent city vendors'
+        ],
+        radiusUsed: searchResult.metadata.searchLocation.radiusKm,
+        totalMatches: searchResult.total
+      },
+      normalization: normalizedSearch || null,
+      availableFilters,
+      metadata: searchResult.metadata
+    };
+
+    // Send final response: include unified search results and metadata
     res.json({
       success: true,
-      data: {
-        total: searchResult.total,
-        results: searchResult.results,
-        page: searchResult.page,
-        limit: searchResult.limit,
-        totalPages: searchResult.totalPages,
-        hasNextPage: searchResult.hasNextPage,
-        hasPrevPage: searchResult.hasPrevPage,
-        searchCriteria: {
-          query: query || null,
-          serviceType: serviceId || null,
-          location: searchResult.metadata.searchLocation,
-          budget: budget || null,
-          verified: verified !== undefined ? verified : null,
-          rating: rating || null
-        },
-        // Search quality metrics
-        searchQuality: {
-          tierBreakdown: searchResult.metadata.tierBreakdown,
-          priorityOrder: [
-            'Exact area match',
-            'Nearby vendors',
-            'Same city vendors',
-            'Adjacent city vendors'
-          ],
-          radiusUsed: searchResult.metadata.searchLocation.radiusKm,
-          totalMatches: searchResult.total
-        },
-        // Normalization context (for debugging/UI)
-        normalization: normalizedSearch ? {
-          originalQuery: normalizedSearch.originalQuery,
-          matchType: normalizedSearch.matchType,
-          confidence: normalizedSearch.confidence,
-          bestMatch: normalizedSearch.bestMatch,
-          suggestedServices: normalizedSearch.taxonomyMatches.services
-            .slice(0, 3)
-            .map(s => ({
-              taxonomyId: s.taxonomyId,
-              name: s.name,
-              icon: s.icon
-            }))
-        } : null,
-        // Available filters based on current results
-        availableFilters,
-        // Metadata
-        metadata: searchResult.metadata
-      }
+      // Unified search results (for frontend compatibility)
+      results: Array.isArray(searchResult.results) ? searchResult.results : [],
+      total: searchResult.total || 0,
+      page: searchResult.page || 1,
+      limit: searchResult.limit || 20,
+      totalPages: searchResult.totalPages || Math.ceil((searchResult.total || 0) / (searchResult.limit || 20)),
+      searchQuality: {
+        tierBreakdown: searchResult.metadata?.tierBreakdown || null
+      },
+      metadata: searchResult.metadata || {},
+      // Legacy / UX-friendly payload
+      ...responsePayload,
+      legacy
     });
     
   } catch (error) {
@@ -175,6 +294,7 @@ exports.getSearchSuggestions = async (req, res, next) => {
     next(error);
   }
 };
+
 
 exports.getVendorById = async (req, res, next) => {
   try {

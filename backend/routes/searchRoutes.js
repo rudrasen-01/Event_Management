@@ -8,6 +8,7 @@ const {
   getSearchSuggestions
 } = require('../controllers/searchController');
 
+
 // @route   POST /api/search
 // @desc    Advanced vendor search with filters (includes normalization)
 // @access  Public
@@ -22,6 +23,7 @@ router.get('/suggestions', getSearchSuggestions);
 // @desc    Get featured vendors
 // @access  Public
 router.get('/featured', getFeaturedVendors);
+
 
 // @route   GET /api/search/by-service/:serviceType
 // @desc    Get vendors by service type

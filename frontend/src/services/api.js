@@ -117,16 +117,17 @@ export const fetchVendors = async (filters = {}) => {
     }
 
     const response = await apiClient.post('/search', searchPayload);
-    
-    if (!response.success) {
+
+    // apiClient response interceptor returns `response.data`, so `response` is the body
+    if (!response || !response.success) {
       console.error('Search failed:', response);
     }
-    
+
     return {
-      vendors: response.success ? response.data.results : [],
-      total: response.success ? response.data.total : 0,
-      tierBreakdown: response.success ? response.data.searchQuality?.tierBreakdown : null,
-      metadata: response.success ? response.data.metadata : null
+      vendors: response && response.success ? response.results : [],
+      total: response && response.success ? response.total : 0,
+      tierBreakdown: response && response.success ? response.searchQuality?.tierBreakdown : null,
+      metadata: response && response.success ? response.metadata : null
     };
   } catch (error) {
     console.error('❌ Error fetching vendors:', error);
