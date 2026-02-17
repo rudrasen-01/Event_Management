@@ -72,6 +72,8 @@ export const fetchVendors = async (filters = {}) => {
       sort: filters.sortBy || 'relevance'
     };
 
+    console.log('🔍 Frontend: Building search payload from filters:', filters);
+
     // Text query - maps to 'query' field in backend
     if (filters.query && filters.query.trim()) {
       searchPayload.query = filters.query.trim();
@@ -100,11 +102,14 @@ export const fetchVendors = async (filters = {}) => {
       }
     }
 
-    // Budget object - only add if min or max exists
-    if (filters.budgetMin || filters.budgetMax) {
+    // Budget object - only add if min or max exists and is greater than 0
+    const hasBudgetMin = filters.budgetMin !== undefined && filters.budgetMin !== null && parseFloat(filters.budgetMin) > 0;
+    const hasBudgetMax = filters.budgetMax !== undefined && filters.budgetMax !== null && parseFloat(filters.budgetMax) > 0;
+    
+    if (hasBudgetMin || hasBudgetMax) {
       searchPayload.budget = {};
-      if (filters.budgetMin) searchPayload.budget.min = parseFloat(filters.budgetMin);
-      if (filters.budgetMax) searchPayload.budget.max = parseFloat(filters.budgetMax);
+      if (hasBudgetMin) searchPayload.budget.min = parseFloat(filters.budgetMin);
+      if (hasBudgetMax) searchPayload.budget.max = parseFloat(filters.budgetMax);
     }
 
     // Additional filters
@@ -112,26 +117,50 @@ export const fetchVendors = async (filters = {}) => {
       searchPayload.verified = filters.verified === true || filters.verified === 'true';
     }
     
-    if (filters.rating && parseFloat(filters.rating) > 0) {
+    if (filters.rating !== undefined && filters.rating !== null && parseFloat(filters.rating) > 0) {
       searchPayload.rating = parseFloat(filters.rating);
     }
+
+    // Service-specific filters (any additional filter properties)
+    const excludedKeys = ['query', 'serviceType', 'city', 'area', 'latitude', 'longitude', 'radius', 
+                          'budgetMin', 'budgetMax', 'verified', 'rating', 'page', 'limit', 'sortBy', 'sort'];
+    
+    const serviceFilters = {};
+    Object.keys(filters).forEach(key => {
+      if (!excludedKeys.includes(key) && filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        serviceFilters[key] = filters[key];
+      }
+    });
+    
+    if (Object.keys(serviceFilters).length > 0) {
+      searchPayload.filters = serviceFilters;
+    }
+
+    console.log('📤 Frontend: Sending search payload to backend:', searchPayload);
 
     const response = await apiClient.post('/search', searchPayload);
     
     if (!response.success) {
-      console.error('Search failed:', response);
+      console.error('❌ Search failed:', response);
+    } else {
+      console.log('✅ Search successful:', {
+        total: response.data.total,
+        results: response.data.results.length,
+        page: response.data.page
+      });
     }
     
     return {
       vendors: response.success ? response.data.results : [],
-      total: response.success ? response.data.total : 0
+      total: response.success ? response.data.total : 0,
+      availableFilters: response.success ? response.data.availableFilters : null
     };
   } catch (error) {
     console.error('❌ Error fetching vendors:', error);
     if (error.response) {
       console.error('Response error:', error.response.data);
     }
-    return { vendors: [], total: 0 };
+    return { vendors: [], total: 0, availableFilters: null };
   }
 };
 

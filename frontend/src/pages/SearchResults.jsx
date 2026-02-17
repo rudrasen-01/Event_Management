@@ -78,6 +78,9 @@ const SearchResults = () => {
     try {
       setLoading(true);
       
+      console.log('🔍 SearchResults: Loading vendors with filters:', filters);
+      console.log('🔍 SearchResults: Detailed location:', detailedLocation);
+      
       // Map filters to the format expected by the API
       const searchFilters = {
         // Map eventCategory/eventSubType to serviceType
@@ -88,19 +91,34 @@ const SearchResults = () => {
         area: detailedLocation.area || undefined,
         latitude: detailedLocation.latitude || undefined,
         longitude: detailedLocation.longitude || undefined,
-        radius: filters.radius || undefined,
-        // Budget filters - only send if user has set them
-        budgetMin: filters.budgetMin && filters.budgetMin > 0 ? filters.budgetMin : undefined,
-        budgetMax: filters.budgetMax && filters.budgetMax > 0 ? filters.budgetMax : undefined,
+        radius: filters.radius && filters.radius !== 'city' ? parseFloat(filters.radius) : undefined,
+        // Budget filters - only send if user has set them and they're greater than 0
+        budgetMin: filters.budgetMin && parseFloat(filters.budgetMin) > 0 ? parseFloat(filters.budgetMin) : undefined,
+        budgetMax: filters.budgetMax && parseFloat(filters.budgetMax) > 0 ? parseFloat(filters.budgetMax) : undefined,
         // Other filters
-        verified: filters.verified,
-        rating: filters.rating,
+        verified: filters.verified !== undefined && filters.verified !== null && filters.verified !== '' ? filters.verified : undefined,
+        rating: filters.rating && parseFloat(filters.rating) > 0 ? parseFloat(filters.rating) : undefined,
         sortBy,
         page: 1,
         limit: 20
       };
+      
+      // Remove undefined values to keep payload clean
+      Object.keys(searchFilters).forEach(key => {
+        if (searchFilters[key] === undefined) {
+          delete searchFilters[key];
+        }
+      });
+
+      console.log('📤 SearchResults: Sending search filters:', searchFilters);
 
       const response = await fetchVendors(searchFilters);
+      
+      console.log('📥 SearchResults: Received response:', {
+        vendorsCount: response.vendors?.length || 0,
+        total: response.total || 0,
+        hasFilters: !!response.availableFilters
+      });
       
       // Use only database-driven results - no mock data fallback
       const vendorsList = response.vendors || [];

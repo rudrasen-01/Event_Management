@@ -574,6 +574,22 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   } = searchParams;
   
   console.log('🔍 VendorModel.comprehensiveSearch - Building query...');
+  console.log('📥 Search params received:', {
+    query: searchQuery,
+    serviceType,
+    location: location ? {
+      city: location.city,
+      area: location.area,
+      hasCoordinates: !!(location.latitude && location.longitude),
+      radius: location.radius
+    } : null,
+    budget,
+    verified,
+    rating,
+    sort,
+    page,
+    limit
+  });
   
   // Base query: Only active vendors appear in public search
   // Verified is just a badge/trust indicator, not a search filter
@@ -583,8 +599,9 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   let useTextScore = false;
   
   // Optional: Admin can explicitly filter by verified status
-  if (verified !== undefined) {
-    query.verified = verified;
+  if (verified !== undefined && verified !== null) {
+    query.verified = verified === true || verified === 'true';
+    console.log('   Verified filter:', query.verified);
   }
   
   console.log('🔍 Search:', { searchQuery, serviceType, city: location?.city, verified: verified !== undefined ? verified : 'any', rating });
@@ -643,45 +660,86 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   // included in the $or conditions above, so no need to add it as AND condition
   
   // LOCATION
+  let useGeospatial = false;
+  let geospatialData = null;
+  
   if (location) {
     // City filter (exact or contains)
-    if (location.city) {
-      query.city = new RegExp(location.city, 'i');
+    if (location.city && location.city.trim()) {
+      query.city = new RegExp(location.city.trim(), 'i');
+      console.log('   City filter:', location.city);
     }
     
-    if (location.area) {
-      query.area = new RegExp(location.area, 'i');
+    if (location.area && location.area.trim()) {
+      query.area = new RegExp(location.area.trim(), 'i');
+      console.log('   Area filter:', location.area);
     }
     
-    // Geospatial search
+    // Geospatial search - takes precedence over city/area text search
     if (location.latitude && location.longitude && location.radius) {
-      const radiusInMeters = (location.radius || 10) * 1000;
+      const radiusInMeters = (parseFloat(location.radius) || 10) * 1000;
+      
+      // Remove text-based city/area filters when using geospatial
       delete query.city;
       delete query.area;
       
+      // Use $geoWithin instead of $nearSphere for compatibility with other filters
       query.location = {
-        $nearSphere: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(location.longitude), parseFloat(location.latitude)]
-          },
-          $maxDistance: radiusInMeters
+        $geoWithin: {
+          $centerSphere: [
+            [parseFloat(location.longitude), parseFloat(location.latitude)],
+            parseFloat(location.radius) / 6378.1  // Convert km to radians (Earth radius = 6378.1 km)
+          ]
         }
       };
+      
+      useGeospatial = true;
+      geospatialData = {
+        lat: parseFloat(location.latitude),
+        lng: parseFloat(location.longitude),
+        radius: parseFloat(location.radius)
+      };
+      
+      console.log('   Geospatial search:', {
+        lat: location.latitude,
+        lng: location.longitude,
+        radius: `${location.radius}km (${radiusInMeters}m)`
+      });
     }
   }
   
   // BUDGET FILTER
   if (budget && (budget.min || budget.max)) {
+    console.log('   Budget filter:', { min: budget.min, max: budget.max });
+    
     const budgetQuery = [];
     
-    if (budget.min && budget.max) {
+    if (budget.min !== undefined && budget.min !== null && budget.max !== undefined && budget.max !== null) {
+      // Both min and max specified - vendor's price range should overlap with user's budget
       budgetQuery.push({
         $or: [
-          // Vendor min price within user budget
-          { 'pricing.min': { $gte: budget.min, $lte: budget.max } },
-          { 'pricing.max': { $gte: budget.min, $lte: budget.max } },
-          // Vendor range encompasses user budget
+          // Vendor's min price is within user's budget range
+          { 
+            $and: [
+              { 'pricing.min': { $gte: budget.min } },
+              { 'pricing.min': { $lte: budget.max } }
+            ]
+          },
+          // Vendor's max price is within user's budget range
+          { 
+            $and: [
+              { 'pricing.max': { $gte: budget.min } },
+              { 'pricing.max': { $lte: budget.max } }
+            ]
+          },
+          // Vendor's average price is within user's budget range
+          { 
+            $and: [
+              { 'pricing.average': { $gte: budget.min } },
+              { 'pricing.average': { $lte: budget.max } }
+            ]
+          },
+          // Vendor's range completely encompasses user's budget
           {
             $and: [
               { 'pricing.min': { $lte: budget.min } },
@@ -690,12 +748,22 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
           }
         ]
       });
-    } else if (budget.min) {
-      // Only minimum budget specified
-      budgetQuery.push({ 'pricing.max': { $gte: budget.min } });
-    } else if (budget.max) {
-      // Only maximum budget specified
-      budgetQuery.push({ 'pricing.min': { $lte: budget.max } });
+    } else if (budget.min !== undefined && budget.min !== null) {
+      // Only minimum budget specified - vendor's max price should be >= user's min budget
+      budgetQuery.push({ 
+        $or: [
+          { 'pricing.max': { $gte: budget.min } },
+          { 'pricing.average': { $gte: budget.min } }
+        ]
+      });
+    } else if (budget.max !== undefined && budget.max !== null) {
+      // Only maximum budget specified - vendor's min price should be <= user's max budget
+      budgetQuery.push({ 
+        $or: [
+          { 'pricing.min': { $lte: budget.max } },
+          { 'pricing.average': { $lte: budget.max } }
+        ]
+      });
     }
     
     if (budgetQuery.length > 0) {
@@ -705,33 +773,41 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   }
   
   // RATING FILTER
-  if (rating) {
+  if (rating !== undefined && rating !== null && parseFloat(rating) > 0) {
     query.rating = { $gte: parseFloat(rating) };
   }
   
   // SERVICE-SPECIFIC FILTERS
-  Object.keys(filters).forEach(filterKey => {
-    if (['verified', 'rating'].includes(filterKey)) return;
+  if (filters && Object.keys(filters).length > 0) {
+    console.log('   Service-specific filters:', filters);
     
-    const filterValue = filters[filterKey];
-    
-    if (filterValue !== undefined && filterValue !== null && filterValue !== '') {
-      if (Array.isArray(filterValue) && filterValue.length > 0) {
-        query[`filters.${filterKey}`] = { $in: filterValue };
-      } else if (typeof filterValue === 'boolean') {
-        // Boolean filter (e.g., has_backup_equipment)
-        query[`filters.${filterKey}`] = filterValue;
-      } else {
-        // Single value filter
-        query[`filters.${filterKey}`] = filterValue;
+    Object.keys(filters).forEach(filterKey => {
+      // Skip common filters that are handled separately
+      if (['verified', 'rating', 'city', 'area', 'budget', 'budgetMin', 'budgetMax'].includes(filterKey)) return;
+      
+      const filterValue = filters[filterKey];
+      
+      if (filterValue !== undefined && filterValue !== null && filterValue !== '') {
+        if (Array.isArray(filterValue) && filterValue.length > 0) {
+          // Array filter (e.g., multiple photography types)
+          query[`filters.${filterKey}`] = { $in: filterValue };
+        } else if (typeof filterValue === 'boolean') {
+          // Boolean filter (e.g., has_backup_equipment)
+          query[`filters.${filterKey}`] = filterValue;
+        } else if (typeof filterValue === 'number') {
+          // Numeric filter (e.g., capacity >= 500)
+          query[`filters.${filterKey}`] = filterValue;
+        } else {
+          // Single value filter (string)
+          query[`filters.${filterKey}`] = filterValue;
+        }
       }
-    }
-  });
+    });
+  }
   
   // SORTING STRATEGY
   let sortOption = {};
-  // Note: We use regex search instead of $text, so no text score available
-  // Sort by relevance factors: featured status, rating, popularity
+  // Note: We use $geoWithin instead of $nearSphere, so distance sorting needs manual calculation
   switch (sort) {
     case 'rating':
       sortOption = { rating: -1, reviewCount: -1 };
@@ -746,7 +822,8 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
       sortOption = { reviewCount: -1, rating: -1 };
       break;
     case 'distance':
-      // Distance sorting is automatic with $near geospatial query
+      // For geospatial queries, we'll calculate distance manually after fetching
+      // For now, sort by rating as fallback
       sortOption = { rating: -1 };
       break;
     case 'popularity':
@@ -774,10 +851,35 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
   
   const total = await this.countDocuments(query);
   
+  // Calculate distance for geospatial searches
+  let processedVendors = vendors;
+  if (useGeospatial && geospatialData) {
+    processedVendors = vendors.map(vendor => {
+      if (vendor.location && vendor.location.coordinates) {
+        const distance = calculateDistance(
+          geospatialData.lat,
+          geospatialData.lng,
+          vendor.location.coordinates[1], // latitude
+          vendor.location.coordinates[0]  // longitude
+        );
+        return {
+          ...vendor,
+          distance: parseFloat(distance.toFixed(2))
+        };
+      }
+      return vendor;
+    });
+    
+    // Sort by distance if sort option is 'distance'
+    if (sort === 'distance') {
+      processedVendors.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+    }
+  }
+  
   console.log(`✅ Query executed: ${vendors.length} vendors returned (${total} total match)`);
   
   return {
-    results: vendors,
+    results: processedVendors,
     total,
     page,
     limit,
@@ -786,6 +888,27 @@ vendorSchema.statics.comprehensiveSearch = async function(searchParams) {
     hasPrevPage: page > 1
   };
 };
+
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return distance;
+}
+
+function toRad(degrees) {
+  return degrees * (Math.PI / 180);
+}
 
 const Vendor = mongoose.model('Vendor', vendorSchema);
 
