@@ -34,6 +34,7 @@ const Header = () => {
   const navItems = [
     { name: 'Home', href: '/', showForAdmin: false },
     { name: 'Search Events', href: '/search', showForAdmin: false },
+    { name: 'Blog', href: '/blogs', showForAdmin: false },
     { name: 'How It Works', href: '/how-it-works', showForAdmin: false },
     { name: 'FAQ', href: '/faq', showForAdmin: false },
     { name: 'Contact', href: '/contact-us', showForAdmin: false },

@@ -256,62 +256,51 @@ const DynamicSearchPageContent = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Top Search Bar - Sticky */}
       <div className="sticky top-16 md:top-20 z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <form onSubmit={handleSearch} className="relative">
-            <div className="flex items-center gap-3">
-              {/* Search Input */}
-              <div className="flex-1 relative">
-                <div className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-gray-300 rounded-lg focus-within:border-indigo-500 transition-colors">
-                  <Search className="w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search for Photographer, Tent, Pandit, Caterer..."
-                    className="flex-1 text-sm focus:outline-none"
-                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                  />
-                  {searchContext.category && filterSchema && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
-                      <span>{filterSchema.detectedService?.icon || '🔍'}</span>
-                      <span>{filterSchema.detectedService?.name || searchContext.category}</span>
-                    </div>
-                  )}
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="relative">
+            {/* Search Input */}
+            <div className="flex items-center gap-3 px-4 h-12 bg-white border-2 border-gray-300 rounded-lg shadow-md hover:border-gray-400 hover:shadow-lg focus-within:border-gray-500 focus-within:shadow-lg transition-all">
+              <Search className="w-5 h-5 text-gray-600 flex-shrink-0" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="What service do you need? (e.g., Photographer, Caterer, Venue)"
+                className="flex-1 text-sm font-semibold placeholder-gray-400 focus:outline-none"
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              />
+              {searchContext.category && filterSchema && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold flex-shrink-0">
+                  <span>{filterSchema.detectedService?.icon || '🔍'}</span>
+                  <span>{filterSchema.detectedService?.name || searchContext.category}</span>
                 </div>
-
-                {/* Service Suggestions Dropdown */}
-                {showSuggestions && suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-                    <div className="p-2">
-                      <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2">
-                        Detected Services
-                      </div>
-                      {suggestions.map(service => (
-                        <button
-                          key={service.serviceId}
-                          onClick={() => handleSuggestionClick(service.serviceId)}
-                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-indigo-50 rounded text-left"
-                        >
-                          <span className="text-2xl">{service.icon}</span>
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{service.serviceName}</div>
-                            <div className="text-xs text-gray-500">Click to load filters</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Search
-              </button>
+              )}
             </div>
-          </form>
+
+            {/* Service Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-gray-300 rounded-lg shadow-xl z-50">
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2">
+                    Detected Services
+                  </div>
+                  {suggestions.map(service => (
+                    <button
+                      key={service.serviceId}
+                      onClick={() => handleSuggestionClick(service.serviceId)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-100 active:bg-gray-200 rounded text-left transition-colors"
+                    >
+                      <span className="text-2xl">{service.icon}</span>
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900">{service.serviceName}</div>
+                        <div className="text-xs text-gray-500">Click to load filters</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Active Service Indicator */}
           {activeService && serviceConfig && (

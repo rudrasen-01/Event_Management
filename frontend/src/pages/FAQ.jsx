@@ -200,7 +200,7 @@ const FAQ = () => {
             <Button size="lg" onClick={() => navigate('/contact-us')}>
               Contact Support
             </Button>
-            <Button variant="outline" size="lg" onClick={() => window.location.href = 'mailto:support@aissignatureevent.com'}>
+            <Button variant="outline" size="lg" onClick={() => window.location.href = 'mailto:info@aissignatureevent.com'}>
               Email Us
             </Button>
           </div>

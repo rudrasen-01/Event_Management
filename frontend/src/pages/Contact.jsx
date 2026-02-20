@@ -107,25 +107,25 @@ const Contact = () => {
     {
       icon: MapPin,
       title: 'Address',
-      content: ['123 Business Center', 'Indore, Madhya Pradesh 452001', 'India'],
+      content: ['491/7, New Railway Road nearby Arora physiotherapy', 'Jawahar Nagar, Sector 12', 'Gurugram, Haryana 122001', 'India'],
       link: null
     },
     {
       icon: Phone,
       title: 'Phone',
-      content: ['+91 98765 43210', '+91 98765 43211'],
-      link: 'tel:+919876543210'
+      content: ['+91 9220836393'],
+      link: 'tel:+919220836393'
     },
     {
       icon: Mail,
       title: 'Email',
-      content: ['support@aissignatureevent.com', 'partnerships@aissignatureevent.com'],
-      link: 'mailto:support@aissignatureevent.com'
+      content: ['info@aissignatureevent.com'],
+      link: 'mailto:info@aissignatureevent.com'
     },
     {
       icon: Clock,
       title: 'Business Hours',
-      content: ['Monday - Saturday: 9:00 AM - 6:00 PM', 'Sunday: 10:00 AM - 4:00 PM'],
+      content: ['Mon - Sat: 10:00 AM - 8:00 PM (Call & Visit Support)', 'Sunday: 11:00 AM - 6:00 PM (Call Support Only)', 'Everyday: 24/7 (Online Search & Booking)'],
       link: null
     }
   ];

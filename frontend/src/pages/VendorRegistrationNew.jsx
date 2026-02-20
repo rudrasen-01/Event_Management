@@ -117,16 +117,18 @@ const VendorRegistrationNew = () => {
     {
       id: 'starter',
       name: 'Starter',
-      price: 999,
+      price: 499,
       duration: 'per month',
       popular: false,
       icon: Zap,
       color: 'indigo',
+      trialDays: 30,
       features: [
+        'First 30 days free trial',
         'Verified badge',
         'Up to 15 images/videos',
         'Higher search ranking',
-        'Blog posts enabled',
+        'Profile managed by AIS team',
         'Priority customer support'
       ],
       limitations: []
@@ -134,17 +136,18 @@ const VendorRegistrationNew = () => {
     {
       id: 'growth',
       name: 'Growth',
-      price: 2499,
+      price: 999,
       duration: 'per month',
       popular: true,
       icon: TrendingUp,
       color: 'purple',
+      trialDays: 30,
       features: [
+        'First 30 days free trial',
         'Featured placement',
         'Up to 30 images/videos',
         'Top search priority',
-        'Unlimited blog posts',
-        'Advanced analytics',
+        'Portfolio enhancement',
         'Social media promotion'
       ],
       limitations: []
@@ -152,19 +155,20 @@ const VendorRegistrationNew = () => {
     {
       id: 'premium',
       name: 'Premium',
-      price: 4999,
+      price: 1499,
       duration: 'per month',
       popular: false,
       icon: Crown,
       color: 'amber',
+      trialDays: 30,
       features: [
+        'First 30 days free trial',
         'Premium badge',
         'Unlimited portfolio',
         'Maximum visibility',
-        'Featured on homepage',
-        'Dedicated account manager',
-        'Custom branding options',
-        'Priority in all categories'
+        'Social media shoutouts',
+        'Dedicated optimization',
+        'Priority in high-demand searches'
       ],
       limitations: []
     }
@@ -622,161 +626,109 @@ const VendorRegistrationNew = () => {
                 </div>
               )}
 
-              {/* Searchable Dropdown */}
+              {/* Unified Category Browser */}
               {!dataLoading && (
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
                     Business Category <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      value={categorySearch}
-                      onChange={(e) => {
-                        setCategorySearch(e.target.value);
-                        setShowCategoryDropdown(true);
-                        if (e.target.value === '') {
-                          handleChange('serviceType', '');
-                        }
-                      }}
-                      onFocus={() => setShowCategoryDropdown(true)}
-                      placeholder="Type to search (e.g., photographer, caterer, DJ, makeup)"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded text-sm
-                             focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                  
-                  {/* Dropdown Results - Grouped by Category */}
-                  {showCategoryDropdown && categorySearch && filteredServices.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                      {(() => {
-                        // Group services by category
-                        const grouped = filteredServices.reduce((acc, service) => {
-                          if (!acc[service.category]) {
-                            acc[service.category] = [];
-                          }
-                          acc[service.category].push(service);
-                          return acc;
-                        }, {});
-
-                        return Object.entries(grouped).map(([category, services]) => (
-                          <div key={category} className="border-b border-gray-100 last:border-b-0">
-                            <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase tracking-wide sticky top-0">
-                              {category}
-                            </div>
-                            {services.map((service) => (
-                              <button
-                                key={service.value}
-                                type="button"
-                                onClick={() => handleCategorySelect(service)}
-                                className={`w-full px-4 py-2.5 text-left hover:bg-blue-50 flex items-center gap-3
-                                          ${formData.serviceType === service.value ? 'bg-blue-50' : ''}`}
-                              >
-                                <span className="text-xl">{service.icon}</span>
-                                <span className="text-sm text-gray-900">{service.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  )}
-                  
-                  {/* No Results */}
-                  {showCategoryDropdown && categorySearch && filteredServices.length === 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
-                      <p className="text-sm text-gray-600">No categories found matching "{categorySearch}"</p>
-                    </div>
-                  )}
-                  </div>
 
                   {/* Selected Category Display */}
                   {(formData.serviceType || formData.customService) && (
-                    <div className="mt-3 bg-green-50 border border-green-200 rounded p-3 flex items-center gap-2">
+                    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
                       <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
                       <span className="text-sm text-green-800 font-medium">
                         Selected: {formData.serviceType ? (vendorServices.find(s => s.value === formData.serviceType)?.label) : formData.customService}
                       </span>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* Browse by Category - Show when search is empty */}
-              {!categorySearch && !dataLoading && (
-                <div className="mt-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-4">Browse by category or type your category manually below</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowManualCategory(prev => !prev)}
-                      className="text-xs text-indigo-600 hover:underline"
-                    >
-                      {showManualCategory ? 'Choose from list' : "Can't find your category? Enter manually"}
-                    </button>
+                  {/* Unified Scrollable Category Browser */}
+                  <div className="border-2 border-gray-300 rounded-lg shadow-md overflow-hidden">
+                    {/* Search Header */}
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
+                        <input
+                          type="text"
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          placeholder="Search categories (e.g., photographer, caterer, DJ, makeup)"
+                          className="w-full h-12 pl-12 pr-4 border-2 border-gray-300 rounded-lg text-sm font-semibold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Scrollable Category List */}
+                    <div className="max-h-64 overflow-y-auto">
+                      {[
+                        'Venues',
+                        'Event Planning',
+                        'Decor & Styling',
+                        'Photography & Videography',
+                        'Food & Catering',
+                        'Music & Entertainment',
+                        'Sound, Light & Technical',
+                        'Rentals & Infrastructure',
+                        'Beauty & Personal Services',
+                        'Religious & Ritual Services',
+                        'Invitations, Gifts & Printing',
+                        'Logistics & Support Services',
+                        'Others'
+                      ].map((cat) => {
+                        const categoryServices = filteredServices.filter(s => s.category === cat);
+                        if (categoryServices.length === 0) return null;
+                        
+                        return (
+                          <div key={cat}>
+                            {/* Sticky Category Header */}
+                            <div className="sticky top-0 bg-gray-100 px-4 py-2 border-b border-gray-200">
+                              <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{cat}</h4>
+                            </div>
+                            
+                            {/* Services under this category */}
+                            <div className="bg-white">
+                              {categoryServices.map((service) => (
+                                <button
+                                  key={service.value}
+                                  type="button"
+                                  onClick={() => handleCategorySelect(service)}
+                                  className={`w-full px-4 py-2.5 text-left hover:bg-blue-50 flex items-center gap-3 border-b border-gray-100 transition-colors
+                                            ${formData.serviceType === service.value ? 'bg-blue-50' : ''}`}
+                                >
+                                  <span className="text-xl">{service.icon}</span>
+                                  <span className="text-sm text-gray-700 flex-1">{service.label}</span>
+                                  {formData.serviceType === service.value && (
+                                    <Check className="w-4 h-4 text-blue-600" />
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {showManualCategory && (
-                    <div className="mb-4">
-                      <label className="text-xs text-gray-600 mb-1 block">Enter your service / business category</label>
-                      <input
-                        type="text"
-                        value={formData.customService}
-                        onChange={(e) => handleChange('customService', e.target.value)}
-                        placeholder="e.g. Luxury Wedding Rentals"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
-                      />
+                  {/* Manual Category Entry - Below Dropdown */}
+                  <div className="mt-4 p-4 bg-gray-50 border border-gray-300 rounded-lg">
+                    <div className="flex items-start gap-2 mb-3">
+                      <Info className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">Can't find your category?</p>
+                        <p className="text-xs text-gray-600">Enter your service or business category manually below</p>
+                      </div>
                     </div>
-                  )}
-                  <div className="space-y-3">
-                    {[
-                      'Venues',
-                      'Event Planning',
-                      'Decor & Styling',
-                      'Photography & Videography',
-                      'Food & Catering',
-                      'Music & Entertainment',
-                      'Sound, Light & Technical',
-                      'Rentals & Infrastructure',
-                      'Beauty & Personal Services',
-                      'Religious & Ritual Services',
-                      'Invitations, Gifts & Printing',
-                      'Logistics & Support Services',
-                      'Others'
-                    ].map((cat) => {
-                      const categoryServices = vendorServices.filter(s => s.category === cat);
-                      if (categoryServices.length === 0) return null;
-                      
-                      return (
-                        <div key={cat} className="border border-gray-200 rounded-lg overflow-hidden">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              const content = e.currentTarget.nextElementSibling;
-                              content.classList.toggle('hidden');
-                            }}
-                            className="w-full px-4 py-3 bg-gray-50 text-left flex items-center justify-between hover:bg-gray-100"
-                          >
-                            <span className="text-sm font-semibold text-gray-700">{cat}</span>
-                            <ChevronRight className="w-4 h-4 text-gray-500" />
-                          </button>
-                          <div className="hidden bg-white">
-                            {categoryServices.map((service) => (
-                              <button
-                                key={service.value}
-                                type="button"
-                                onClick={() => handleCategorySelect(service)}
-                                className={`w-full px-4 py-2.5 text-left hover:bg-blue-50 flex items-center gap-3 border-t border-gray-100
-                                          ${formData.serviceType === service.value ? 'bg-blue-50' : ''}`}
-                              >
-                                <span className="text-xl">{service.icon}</span>
-                                <span className="text-sm text-gray-700">{service.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <input
+                      type="text"
+                      value={formData.customService}
+                      onChange={(e) => {
+                        handleChange('customService', e.target.value);
+                        handleChange('serviceType', ''); // Clear dropdown selection
+                      }}
+                      placeholder="e.g. Luxury Wedding Rentals, Event Photography, etc."
+                      className="w-full px-4 py-2.5 text-sm font-medium border-2 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                 </div>
               )}

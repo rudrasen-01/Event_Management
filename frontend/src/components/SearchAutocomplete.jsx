@@ -30,7 +30,8 @@ const SearchAutocomplete = ({
   className = '',
   inputClassName = '',
   showIcon = true,
-  autoFocus = false
+  autoFocus = false,
+  hideHelperText = false
 }) => {
   // Component state
   const [query, setQuery] = useState('');
@@ -256,7 +257,7 @@ const SearchAutocomplete = ({
 
     return parts.map((part, index) => 
       regex.test(part) ? (
-        <mark key={index} className="bg-yellow-200 text-gray-900 font-semibold">
+        <mark key={index} className="bg-gray-200 text-gray-900 font-bold">
           {part}
         </mark>
       ) : (
@@ -270,13 +271,13 @@ const SearchAutocomplete = ({
    */
   const getTypeBadge = (type) => {
     const styles = {
-      service: 'bg-blue-100 text-blue-700 border-blue-200',
-      subcategory: 'bg-purple-100 text-purple-700 border-purple-200',
-      category: 'bg-green-100 text-green-700 border-green-200'
+      service: 'bg-gray-200 text-gray-800 border-gray-300',
+      subcategory: 'bg-gray-200 text-gray-700 border-gray-300',
+      category: 'bg-gray-200 text-gray-800 border-gray-300'
     };
 
     return (
-      <span className={`text-xs px-2 py-0.5 rounded-full border ${styles[type] || styles.service}`}>
+      <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${styles[type] || styles.service}`}>
         {type}
       </span>
     );
@@ -285,9 +286,9 @@ const SearchAutocomplete = ({
   return (
     <div className={`relative w-full ${className}`}>
       {/* Search Input */}
-      <div className="relative">
+      <div className="relative flex items-center h-full">
         {showIcon && (
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          <Search className="absolute left-4 w-5 h-5 text-gray-600 pointer-events-none" />
         )}
         
         <input
@@ -304,12 +305,12 @@ const SearchAutocomplete = ({
           placeholder={placeholder}
           autoFocus={autoFocus}
           className={`
-            w-full px-4 py-3 pr-10
-            ${showIcon ? 'pl-11' : ''}
-            border border-gray-300 rounded-lg
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-            placeholder-gray-400 text-gray-900
-            transition-colors duration-200
+            w-full h-full
+            ${showIcon ? 'pl-12 pr-4' : 'px-4'}
+            border-0 focus:outline-none
+            placeholder-gray-400 text-gray-900 font-semibold
+            bg-transparent
+            text-sm
             ${inputClassName}
           `}
           aria-label="Search input"
@@ -320,7 +321,7 @@ const SearchAutocomplete = ({
         />
 
         {/* Loading Spinner / Clear Button */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+        <div className="absolute right-3">
           {isLoading ? (
             <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
           ) : query ? (
@@ -342,7 +343,7 @@ const SearchAutocomplete = ({
           ref={dropdownRef}
           id="autocomplete-dropdown"
           role="listbox"
-          className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-xl max-h-96 overflow-y-auto"
+          className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-300 rounded-xl shadow-xl max-h-96 overflow-y-auto"
         >
           {/* Loading State */}
           {isLoading && suggestions.length === 0 && (
@@ -379,9 +380,9 @@ const SearchAutocomplete = ({
                   className={`
                     w-full px-4 py-3 text-left
                     flex items-center gap-3
-                    hover:bg-blue-50 transition-colors
+                    hover:bg-gray-100 active:bg-gray-200 transition-colors
                     border-b border-gray-100 last:border-b-0
-                    ${selectedIndex === index ? 'bg-blue-50' : 'bg-white'}
+                    ${selectedIndex === index ? 'bg-gray-100' : 'bg-white'}
                   `}
                   role="option"
                   aria-selected={selectedIndex === index}
@@ -394,12 +395,12 @@ const SearchAutocomplete = ({
 
                   {/* Text Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
+                    <div className="text-sm font-semibold text-gray-900 truncate">
                       {highlightMatch(suggestion.label, query)}
                     </div>
                     
                     {suggestion.matchedKeyword && (
-                      <div className="text-xs text-gray-500 mt-0.5">
+                      <div className="text-xs text-gray-600 mt-0.5">
                         Matches: {highlightMatch(suggestion.matchedKeyword, query)}
                       </div>
                     )}
@@ -412,7 +413,7 @@ const SearchAutocomplete = ({
 
                   {/* Trending Icon (for high score items) */}
                   {suggestion.score > 80 && (
-                    <TrendingUp className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <TrendingUp className="w-4 h-4 text-gray-700 flex-shrink-0" />
                   )}
                 </button>
               ))}
@@ -422,8 +423,8 @@ const SearchAutocomplete = ({
       )}
 
       {/* Helper Text */}
-      {!isOpen && !query && (
-        <p className="mt-2 text-xs text-gray-500">
+      {!hideHelperText && !isOpen && !query && (
+        <p className="absolute top-full left-0 mt-1 text-xs text-gray-500 whitespace-nowrap">
           Start typing to see suggestions (min {minChars} character{minChars !== 1 ? 's' : ''})
         </p>
       )}

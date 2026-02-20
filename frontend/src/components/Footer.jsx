@@ -47,10 +47,10 @@ const Footer = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex items-center justify-center space-x-2 mb-2">
             <MapPin className="w-5 h-5 text-white" />
-            <span className="text-white font-bold text-lg">Currently serving in: Indore</span>
+            <span className="text-white font-bold text-lg">Coverage: Pan-India | Operating: Across India</span>
           </div>
           <p className="text-purple-100 text-sm">
-            More cities coming soon! Stay tuned for updates.
+            Discover the best event professionals across India. New features and verified listings being added daily!
           </p>
         </div>
       </div>

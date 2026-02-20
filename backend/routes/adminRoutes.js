@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const keywordController = require('../controllers/keywordController');
+const blogController = require('../controllers/blogController');
 const { adminOnly } = require('../middleware/adminMiddleware');
 
 // All routes protected by adminOnly middleware
@@ -173,5 +174,60 @@ router.post('/keywords/suggest', keywordController.getKeywordSuggestions);
  * @access  Admin
  */
 router.post('/keywords/regenerate', keywordController.regenerateAllVendorKeywords);
+
+/**
+ * ==========================================
+ * BLOG MANAGEMENT ROUTES
+ * ==========================================
+ */
+
+/**
+ * @route   GET /api/admin/blogs/stats
+ * @desc    Get blog statistics
+ * @access  Admin
+ */
+router.get('/blogs/stats', blogController.getBlogStats);
+
+/**
+ * @route   GET /api/admin/blogs
+ * @desc    Get all blogs (admin view)
+ * @access  Admin
+ */
+router.get('/blogs', blogController.getAllBlogs);
+
+/**
+ * @route   POST /api/admin/blogs
+ * @desc    Create new blog
+ * @access  Admin
+ */
+router.post('/blogs', blogController.createBlog);
+
+/**
+ * @route   GET /api/admin/blogs/:id
+ * @desc    Get single blog by ID
+ * @access  Admin
+ */
+router.get('/blogs/:id', blogController.getBlogById);
+
+/**
+ * @route   PUT /api/admin/blogs/:id
+ * @desc    Update blog
+ * @access  Admin
+ */
+router.put('/blogs/:id', blogController.updateBlog);
+
+/**
+ * @route   DELETE /api/admin/blogs/:id
+ * @desc    Delete blog
+ * @access  Admin
+ */
+router.delete('/blogs/:id', blogController.deleteBlog);
+
+/**
+ * @route   PATCH /api/admin/blogs/:id/toggle-publish
+ * @desc    Toggle blog publish status
+ * @access  Admin
+ */
+router.patch('/blogs/:id/toggle-publish', blogController.togglePublish);
 
 module.exports = router;

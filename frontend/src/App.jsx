@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import VendorLayout from './components/VendorLayout';
@@ -34,6 +35,8 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import CookiePolicy from './pages/CookiePolicy';
 import PlansPage from './pages/PlansPage';
+import BlogListingPage from './pages/BlogListingPage';
+import BlogDetailPage from './pages/BlogDetailPage';
 import WhatsAppButton from './components/WhatsAppButton';
 
 // PublicLayout component
@@ -53,6 +56,8 @@ const PublicLayout = () => (
         <Route path="/plans" element={<PlansPage />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/contact-us" element={<Contact />} />
+        <Route path="/blogs" element={<BlogListingPage />} />
+        <Route path="/blogs/:slug" element={<BlogDetailPage />} />
         <Route path="/privacy-policy" element={<Privacy />} />
         <Route path="/cookie-policy" element={<CookiePolicy />} />
         <Route path="/terms-and-conditions" element={<Terms />} />
@@ -136,15 +141,17 @@ const AppRoutes = () => {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <VendorAuthProvider>
-          <SearchProvider>
-            <AppRoutes />
-          </SearchProvider>
-        </VendorAuthProvider>
-      </AuthProvider>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <AuthProvider>
+          <VendorAuthProvider>
+            <SearchProvider>
+              <AppRoutes />
+            </SearchProvider>
+          </VendorAuthProvider>
+        </AuthProvider>
+      </Router>
+    </HelmetProvider>
   );
 }
 

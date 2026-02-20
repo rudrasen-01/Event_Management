@@ -29,6 +29,7 @@ const dynamicRoutes = require('./routes/dynamicRoutes');
 const taxonomyRoutes = require('./routes/taxonomyRoutes');
 const vendorProfileRoutes = require('./routes/vendorProfileRoutes');
 const locationRoutes = require('./routes/locationRoutes');
+const blogRoutes = require('./routes/blogRoutes');
 
 // Use Routes
 app.use('/api/services', serviceRoutes);
@@ -41,6 +42,7 @@ app.use('/api/dynamic', dynamicRoutes); // Dynamic data endpoints
 app.use('/api/taxonomy', taxonomyRoutes); // Master taxonomy system
 app.use('/api/vendor-profile', vendorProfileRoutes); // Vendor profile management
 app.use('/api/locations', locationRoutes); // Cities and areas from OSM
+app.use('/api/blogs', blogRoutes); // Public blog endpoints
 
 // Detect service intent endpoint (special case - not under /services)
 const { detectServiceIntent } = require('./controllers/serviceController');

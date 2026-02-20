@@ -174,8 +174,8 @@ const CookiePolicy = () => {
           <p className="text-gray-600 leading-relaxed">
             If you have any questions regarding this Cookie Policy, you may contact us at:
           </p>
-          <a href="mailto:support@aissignatureevent.com" className="inline-block mt-4 text-indigo-600 hover:text-indigo-700 font-semibold">
-            support@aissignatureevent.com
+          <a href="mailto:info@aissignatureevent.com" className="inline-block mt-4 text-indigo-600 hover:text-indigo-700 font-semibold">
+            info@aissignatureevent.com
           </a>
         </div>
       </div>
