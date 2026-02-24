@@ -6,6 +6,13 @@ import {
 } from 'lucide-react';
 import { fetchPublishedBlogs, getBlogCategories, getBlogTags } from '../services/blogService';
 
+// Helper to safely get image URL from featuredImage (handles both string and object)
+const getImageUrl = (featuredImage) => {
+  if (typeof featuredImage === 'string') return featuredImage;
+  if (typeof featuredImage === 'object' && featuredImage?.url) return featuredImage.url;
+  return 'https://via.placeholder.com/800x400?text=No+Image';
+};
+
 const BlogListingPage = () => {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,11 +47,13 @@ const BlogListingPage = () => {
       if (selectedTag !== 'all') params.tag = selectedTag;
 
       const response = await fetchPublishedBlogs(params);
-      setBlogs(response.data?.blogs || response.blogs || []);
+      
+      // Backend returns {data: [blogs], pagination: {...}} after response interceptor
+      setBlogs(response.data || []);
       setPagination({
-        page: response.data?.page || response.page || 1,
-        totalPages: response.data?.totalPages || response.totalPages || 1,
-        total: response.data?.total || response.total || 0
+        page: response.pagination?.page || 1,
+        totalPages: response.pagination?.pages || 1,
+        total: response.pagination?.total || 0
       });
     } catch (error) {
       console.error('Error loading blogs:', error);
@@ -136,11 +145,15 @@ const BlogListingPage = () => {
               className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
             >
               <option value="all">All Categories</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
+              {categories.map((category) => {
+                // Handle both string and object formats
+                const categoryValue = typeof category === 'string' ? category : category.name;
+                return (
+                  <option key={categoryValue} value={categoryValue}>
+                    {categoryValue}
+                  </option>
+                );
+              })}
             </select>
 
             {/* Tag Filter */}
@@ -150,11 +163,16 @@ const BlogListingPage = () => {
               className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
             >
               <option value="all">All Tags</option>
-              {tags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
+              {tags.map((tag) => {
+                // Tags are objects with {name, count}
+                const tagValue = typeof tag === 'string' ? tag : tag.name;
+                const tagDisplay = typeof tag === 'object' ? `${tag.name} (${tag.count})` : tag;
+                return (
+                  <option key={tagValue} value={tagValue}>
+                    {tagDisplay}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -206,7 +224,7 @@ const BlogListingPage = () => {
                   {blog.featuredImage && (
                     <div className="relative h-56 overflow-hidden">
                       <img
-                        src={blog.featuredImage}
+                        src={getImageUrl(blog.featuredImage)}
                         alt={blog.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                       />

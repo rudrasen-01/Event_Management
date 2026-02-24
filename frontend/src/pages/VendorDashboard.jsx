@@ -547,7 +547,27 @@ const VendorDashboard = () => {
                   </div>
                   <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-xl">
                     <p className="text-xs text-purple-600 font-medium mb-1">Event Date</p>
-                    <p className="font-bold text-gray-900">{inquiry.eventDate ? new Date(inquiry.eventDate).toLocaleDateString() : 'TBD'}</p>
+                    <p className="font-bold text-gray-900">
+                      {(() => {
+                        const d = inquiry.eventDate;
+                        if (!d) return 'TBD';
+                        try {
+                          if (d.start || d.end) {
+                            const s = d.start ? new Date(d.start) : null;
+                            const e = d.end ? new Date(d.end) : s;
+                            if (s && e && e.getTime() > s.getTime()) {
+                              return `${s.toLocaleDateString()} - ${e.toLocaleDateString()}`;
+                            }
+                            return s ? s.toLocaleDateString() : 'TBD';
+                          }
+                          // legacy single date
+                          const single = new Date(d);
+                          return isNaN(single.getTime()) ? 'TBD' : single.toLocaleDateString();
+                        } catch (err) {
+                          return 'TBD';
+                        }
+                      })()}
+                    </p>
                   </div>
                   <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 rounded-xl">
                     <p className="text-xs text-orange-600 font-medium mb-1">City</p>

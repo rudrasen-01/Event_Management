@@ -86,19 +86,33 @@ const VendorCard = ({
         variant === 'featured' ? 'ring-2 ring-indigo-400' : ''
       }`}
     >
-      {/* Premium Header with Service Type Badge */}
-      <div className="relative h-28 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
+      {/* Premium Header with Cover Image or Gradient */}
+      <div className="relative h-32 overflow-hidden">
+        {/* Cover Image or Gradient Background */}
+        {vendor.coverImage ? (
+          <img 
+            src={vendor.coverImage} 
+            alt={`${vendor.name} cover`}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500"></div>
+        )}
         
-        {/* Decorative elements */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -mr-16 -mt-16 blur-2xl"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full -ml-12 -mb-12 blur-2xl"></div>
-        </div>
+        {/* Overlay for better text readability */}
+        <div className="absolute inset-0 bg-black/20"></div>
+        
+        {/* Decorative elements (only if no cover image) */}
+        {!vendor.coverImage && (
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -mr-16 -mt-16 blur-2xl"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full -ml-12 -mb-12 blur-2xl"></div>
+          </div>
+        )}
 
         {/* Rating Badge */}
         {showRating && vendor.rating > 0 && (
-          <div className="absolute top-3 right-3 px-2.5 py-1 bg-white/95 backdrop-blur-sm rounded-lg flex items-center gap-1 shadow-lg">
+          <div className="absolute top-3 right-3 px-2.5 py-1 bg-white/95 backdrop-blur-sm rounded-lg flex items-center gap-1 shadow-lg z-10">
             <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
             <span className="text-sm font-bold text-gray-900">{vendor.rating}</span>
             <span className="text-xs text-gray-500">({vendor.reviewCount || 0})</span>
@@ -107,7 +121,7 @@ const VendorCard = ({
 
         {/* Featured Badge */}
         {(variant === 'featured' || vendor.isFeatured) && (
-          <div className="absolute top-3 left-3 px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg flex items-center gap-1 shadow-lg">
+          <div className="absolute top-3 left-3 px-2.5 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg flex items-center gap-1 shadow-lg z-10">
             <Award className="w-3.5 h-3.5 text-white" />
             <span className="text-xs font-bold text-white uppercase tracking-wide">Featured</span>
           </div>
@@ -115,15 +129,26 @@ const VendorCard = ({
 
         {/* Response Time Badge */}
         {vendor.responseTime && (
-          <div className="absolute bottom-3 left-3 px-2 py-0.5 bg-green-500/90 backdrop-blur-sm rounded-md flex items-center gap-1">
+          <div className="absolute bottom-3 left-3 px-2 py-0.5 bg-green-500/90 backdrop-blur-sm rounded-md flex items-center gap-1 z-10">
             <Clock className="w-3 h-3 text-white" />
             <span className="text-xs font-semibold text-white">{vendor.responseTime}</span>
+          </div>
+        )}
+        
+        {/* Profile Image Badge - Bottom right circle */}
+        {vendor.profileImage && (
+          <div className="absolute -bottom-8 right-4 w-16 h-16 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100 z-10">
+            <img 
+              src={vendor.profileImage} 
+              alt={vendor.name}
+              className="w-full h-full object-cover"
+            />
           </div>
         )}
       </div>
 
       {/* Card Content */}
-      <div className={cardPadding}>
+      <div className={`${cardPadding} ${vendor.profileImage ? 'pt-10' : ''}`}>
         {/* Vendor Name & Verification */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="font-bold text-lg text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-2 flex-1">

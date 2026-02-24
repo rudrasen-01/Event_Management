@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard Debug</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        h1 { color: #333; margin-bottom: 30px; }
+        .section { margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; margin: 5px; transition: transform 0.2s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.3); }
+        button:active { transform: translateY(0); }
+        .success { color: #10b981; font-weight: bold; }
+        .error { color: #ef4444; font-weight: bold; }
+        .warning { color: #f59e0b; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin: 20px 0; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Admin Dashboard Debugger</h1>
+        
+        <div class="section">
+            <h2>📊 Dashboard Data Test</h2>
+            <p>यह tool आपके admin panel के सभी APIs को test करेगा।</p>
+            <button onclick="testAllAPIs()">🚀 Test All APIs</button>
+            <button onclick="checkToken()">🔑 Check Token</button>
+            <button onclick="clearAndReload()">🗑️ Clear Storage & Reload</button>
+        </div>
+
+        <div class="section">
+            <h3>Current Token Status</h3>
+            <pre id="tokenStatus">Click "Check Token" to see current status</pre>
+        </div>
+
+        <div class="section">
+            <h3>API Test Results</h3>
+            <div class="grid">
+                <div class="card">
+                    <h4>📊 Stats API</h4>
+                    <pre id="statsResult">Not tested</pre>
+                </div>
+                <div class="card">
+                    <h4>👥 Users API</h4>
+                    <pre id="usersResult">Not tested</pre>
+                </div>
+                <div class="card">
+                    <h4>🏪 Vendors API</h4>
+                    <pre id="vendorsResult">Not tested</pre>
+                </div>
+                <div class="card">
+                    <h4>📧 Inquiries API</h4>
+                    <pre id="inquiriesResult">Not tested</pre>
+                </div>
+                <div class="card">
+                    <h4>📝 Blogs API</h4>
+                    <pre id="blogsResult">Not tested</pre>
+                </div>
+                <div class="card">
+                    <h4>🔔 Activity API</h4>
+                    <pre id="activityResult">Not tested</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Detailed Error Log</h3>
+            <pre id="errorLog"></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let errorLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            errorLog.push(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+            document.getElementById('errorLog').textContent = errorLog.join('\n');
+        }
+
+        function checkToken() {
+            const output = document.getElementById('tokenStatus');
+            const token = localStorage.getItem('authToken');
+            const user = localStorage.getItem('authUser');
+            
+            if (!token) {
+                output.innerHTML = '<span class="error">❌ No token found!</span>\n\nPlease login first.';
+                log('No token in localStorage', 'error');
+                return false;
+            }
+            
+            try {
+                // Decode JWT
+                const parts = token.split('.');
+                const payload = JSON.parse(atob(parts[1]));
+                const now = Math.floor(Date.now() / 1000);
+                const expired = payload.exp && payload.exp < now;
+                
+                let status = expired ? '<span class="error">❌ EXPIRED</span>' : '<span class="success">✅ VALID</span>';
+                
+                output.innerHTML = `${status}\n\n` +
+                    `User: ${payload.email}\n` +
+                    `Role: ${payload.role}\n` +
+                    `Issued: ${new Date(payload.iat * 1000).toLocaleString()}\n` +
+                    `Expires: ${new Date(payload.exp * 1000).toLocaleString()}\n\n` +
+                    `User Data:\n${user ? JSON.stringify(JSON.parse(user), null, 2) : 'None'}`;
+                
+                if (expired) {
+                    log('Token is expired - need to re-login', 'error');
+                    alert('⚠️ Token expired! Please re-login.');
+                    return false;
+                }
+                
+                log('Token is valid', 'success');
+                return true;
+            } catch (e) {
+                output.innerHTML = '<span class="error">❌ Invalid token format</span>\n\n' + e.message;
+                log('Token decode error: ' + e.message, 'error');
+                return false;
+            }
+        }
+
+        async function testAPI(name, endpoint, resultId) {
+            const resultEl = document.getElementById(resultId);
+            resultEl.innerHTML = '<div class="loading"></div> Testing...';
+            
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                resultEl.innerHTML = '<span class="error">❌ No token</span>';
+                return;
+            }
+            
+            try {
+                log(`Testing ${name} API: ${endpoint}`, 'info');
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 10000
+                });
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    data = { raw: text };
+                }
+                
+                if (!response.ok) {
+                    resultEl.innerHTML = `<span class="error">❌ Failed (${response.status})</span>\n\n` +
+                        `Error: ${data.error?.message || data.message || 'Unknown error'}\n\n` +
+                        `Code: ${data.error?.code || 'N/A'}`;
+                    log(`${name} API failed: ${response.status} - ${data.error?.message}`, 'error');
+                    return;
+                }
+                
+                // Success - show summary
+                let summary = `<span class="success">✅ Success</span>\n\n`;
+                
+                if (data.data) {
+                    if (Array.isArray(data.data)) {
+                        summary += `Count: ${data.data.length}\n`;
+                    } else if (data.data.inquiries) {
+                        summary += `Inquiries: ${data.data.inquiries?.length || 0}\n`;
+                        summary += `Total: ${data.data.total || 0}\n`;
+                    } else if (data.data.vendors) {
+                        summary += `Vendors: ${data.data.vendors?.length || 0}\n`;
+                        summary += `Total: ${data.data.total || 0}\n`;
+                    } else if (data.data.users) {
+                        summary += `Users: ${data.data.users?.length || 0}\n`;
+                        summary += `Total: ${data.data.total || 0}\n`;
+                    } else if (data.data.blogs) {
+                        summary += `Blogs: ${data.data.blogs?.length || 0}\n`;
+                    } else {
+                        summary += `Data Keys: ${Object.keys(data.data).join(', ')}\n`;
+                    }
+                }
+                
+                summary += `\nFull Response:\n${JSON.stringify(data, null, 2).substring(0, 500)}...`;
+                resultEl.innerHTML = summary;
+                log(`${name} API success`, 'success');
+                
+            } catch (error) {
+                resultEl.innerHTML = `<span class="error">❌ Network Error</span>\n\n${error.message}`;
+                log(`${name} API network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAllAPIs() {
+            if (!checkToken()) {
+                alert('❌ Please login first or your token is expired!');
+                return;
+            }
+            
+            log('Starting comprehensive API test...', 'info');
+            errorLog = ['=== API Test Started ==='];
+            document.getElementById('errorLog').textContent = errorLog.join('\n');
+            
+            await Promise.all([
+                testAPI('Stats', '/admin/stats', 'statsResult'),
+                testAPI('Users', '/admin/users?page=1&limit=10', 'usersResult'),
+                testAPI('Vendors', '/admin/vendors?page=1&limit=10', 'vendorsResult'),
+                testAPI('Inquiries', '/admin/inquiries?page=1&limit=10', 'inquiriesResult'),
+                testAPI('Blogs', '/admin/blogs?page=1&limit=10', 'blogsResult'),
+                testAPI('Activity', '/admin/activity?limit=5', 'activityResult')
+            ]);
+            
+            log('=== API Test Completed ===', 'info');
+        }
+
+        function clearAndReload() {
+            if (confirm('⚠️ यह सब localStorage data clear कर देगा। Continue?')) {
+                localStorage.clear();
+                alert('✅ Storage cleared! अब page reload होगा।');
+                location.reload();
+            }
+        }
+
+        // Auto-check token on load
+        window.onload = function() {
+            checkToken();
+            
+            // Show helpful message
+            const hasToken = localStorage.getItem('authToken');
+            if (!hasToken) {
+                alert('⚠️ No token found! Please login first at http://localhost:5173');
+            }
+        };
+    </script>
+</body>
+</html>

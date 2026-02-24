@@ -4,6 +4,11 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import App from './App.jsx'
 import './index.css'
 
+// Import auth debug utilities (dev only)
+if (import.meta.env.DEV) {
+  import('./utils/authDebug.js');
+}
+
 // Get Google Client ID from environment variable
 // In production, set this in your hosting platform's environment variables
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your-google-client-id-here.apps.googleusercontent.com';

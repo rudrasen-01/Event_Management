@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   Calendar, Eye, Clock, ChevronLeft, Share2, 
@@ -8,6 +8,13 @@ import {
 import { Helmet } from 'react-helmet-async';
 import { getBlogBySlug } from '../services/blogService';
 
+// Helper to safely get image URL from featuredImage (handles both string and object)
+const getImageUrl = (featuredImage) => {
+  if (typeof featuredImage === 'string') return featuredImage;
+  if (typeof featuredImage === 'object' && featuredImage?.url) return featuredImage.url;
+  return 'https://via.placeholder.com/800x400?text=No+Image';
+};
+
 const BlogDetailPage = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -15,10 +22,17 @@ const BlogDetailPage = () => {
   const [relatedBlogs, setRelatedBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Track which slug we've already loaded to prevent duplicate view counts
+  const loadedSlugRef = useRef(null);
 
   useEffect(() => {
-    loadBlog();
-    window.scrollTo(0, 0);
+    // Only load if this is a new slug (prevents double-loading in StrictMode)
+    if (loadedSlugRef.current !== slug) {
+      loadedSlugRef.current = slug;
+      loadBlog();
+      window.scrollTo(0, 0);
+    }
   }, [slug]);
 
   const loadBlog = async () => {
@@ -87,12 +101,12 @@ const BlogDetailPage = () => {
         <meta name="description" content={blog.metaDescription || blog.excerpt} />
         <meta property="og:title" content={blog.title} />
         <meta property="og:description" content={blog.excerpt} />
-        <meta property="og:image" content={blog.featuredImage} />
+        <meta property="og:image" content={getImageUrl(blog.featuredImage)} />
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={blog.title} />
         <meta name="twitter:description" content={blog.excerpt} />
-        <meta name="twitter:image" content={blog.featuredImage} />
+        <meta name="twitter:image" content={getImageUrl(blog.featuredImage)} />
       </Helmet>
 
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -162,7 +176,7 @@ const BlogDetailPage = () => {
           {blog.featuredImage && (
             <div className="mb-12 rounded-2xl overflow-hidden shadow-2xl">
               <img
-                src={blog.featuredImage}
+                src={getImageUrl(blog.featuredImage)}
                 alt={blog.title}
                 className="w-full h-auto object-cover"
               />
@@ -256,7 +270,7 @@ const BlogDetailPage = () => {
                     {relatedBlog.featuredImage && (
                       <div className="relative h-48 overflow-hidden">
                         <img
-                          src={relatedBlog.featuredImage}
+                          src={getImageUrl(relatedBlog.featuredImage)}
                           alt={relatedBlog.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                         />

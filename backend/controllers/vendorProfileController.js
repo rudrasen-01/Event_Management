@@ -12,6 +12,53 @@ const VendorReview = require('../models/VendorReview');
 const { uploadImage, uploadVideo, deleteFile } = require('../utils/cloudinaryHelper');
 
 /**
+ * Helper: Get vendor plan limits
+ * Updated with structured subscription plans
+ */
+const getVendorLimits = function(planType) {
+  const limits = {
+    free: {
+      portfolioLimit: 5,        // 5 images only
+      videoLimit: 0,            // NO videos
+      blogLimit: 2,
+      allowVideos: false,       // Video upload disabled
+      planName: 'Free Plan',
+      planPrice: '₹0',
+      features: ['Basic listing', 'Up to 5 images only', 'No videos']
+    },
+    starter: {
+      portfolioLimit: 15,       // 15 total media (images + videos combined)
+      videoLimit: 15,           // Included in portfolio limit
+      blogLimit: 10,
+      allowVideos: true,        // Video upload enabled
+      planName: 'Starter Plan',
+      planPrice: '₹499',
+      features: ['Verified badge', 'Up to 15 media items', 'Images & Videos', 'Blog posts']
+    },
+    growth: {
+      portfolioLimit: 30,       // 30 total media (images + videos combined)
+      videoLimit: 30,           // Included in portfolio limit
+      blogLimit: 30,
+      allowVideos: true,        // Video upload enabled
+      planName: 'Growth Plan',
+      planPrice: '₹999',
+      features: ['Featured placement', 'Up to 30 media items', 'Images & Videos', 'Priority listing']
+    },
+    premium: {
+      portfolioLimit: -1,       // Unlimited
+      videoLimit: -1,           // Unlimited
+      blogLimit: -1,
+      allowVideos: true,        // Video upload enabled
+      planName: 'Premium Plan',
+      planPrice: '₹1499',
+      features: ['Premium badge', 'Unlimited portfolio', 'Unlimited videos', '24/7 Priority support']
+    }
+  };
+
+  return limits[planType] || limits.free;
+};
+
+/**
  * Get complete vendor profile (Public)
  * Fetches all profile data dynamically from database
  */
@@ -33,6 +80,8 @@ exports.getVendorProfile = async (req, res) => {
     }
 
     console.log('Vendor found:', vendor.businessName);
+    console.log('Profile Image:', vendor.profileImage || 'Not set');
+    console.log('Cover Image:', vendor.coverImage || 'Not set');
 
     // Only show active and verified vendors publicly
     if (!vendor.isActive || !vendor.verified) {
@@ -43,18 +92,20 @@ exports.getVendorProfile = async (req, res) => {
       });
     }
 
-    // Fetch media (public only)
+    // Fetch media (public and approved only)
     const media = await VendorMedia.find({
       vendorId,
-      visibility: 'public'
+      visibility: 'public',
+      approvalStatus: 'approved'
     }).sort({ isFeatured: -1, orderIndex: 1 }).limit(50);
 
     console.log('Media found:', media.length);
 
-    // Fetch published blogs
+    // Fetch published and approved blogs
     const blogs = await VendorBlog.find({
       vendorId,
-      status: 'published'
+      status: 'published',
+      approvalStatus: 'approved'
     }).sort({ publishedAt: -1 }).limit(10);
 
     console.log('Blogs found:', blogs.length);
@@ -99,7 +150,9 @@ exports.getVendorProfile = async (req, res) => {
         yearsInBusiness: vendor.yearsInBusiness || 0,
         contact: vendor.contact,
         pricing: vendor.pricing,
-        planType: vendor.planType || 'free'
+        planType: vendor.planType || 'free',
+        profileImage: vendor.profileImage || '',
+        coverImage: vendor.coverImage || ''
       },
       media: media.map(m => ({
         id: m._id,
@@ -183,6 +236,15 @@ exports.getVendorDashboard = async (req, res) => {
     const vendor = await VendorNew.findById(vendorId);
     const completionScore = calculateProfileCompletion(vendor, media, blogs, videos);
 
+    // Get plan limits and current usage
+    const planType = vendor.planType || 'free';
+    const limits = getVendorLimits(planType);
+    const currentUsage = {
+      portfolioCount: media.length,
+      blogCount: blogs.length,
+      videoCount: videos.length
+    };
+
     res.json({
       success: true,
       data: {
@@ -190,8 +252,9 @@ exports.getVendorDashboard = async (req, res) => {
         blogs,
         videos,
         profileCompletion: completionScore,
-        planType: vendor.planType || 'free',
-        limits: getVendorLimits(vendor.planType || 'free')
+        planType,
+        limits,
+        currentUsage
       }
     });
   } catch (error) {
@@ -199,6 +262,137 @@ exports.getVendorDashboard = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard data'
+    });
+  }
+};
+
+/**
+ * Get vendor's media (portfolio photos/videos) - Authenticated
+ */
+exports.getVendorMedia = async (req, res) => {
+  try {
+    const vendorId = req.vendor?._id || req.user?._id;
+    
+    if (!vendorId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Vendor ID not found. Please login again.'
+      });
+    }
+
+    console.log('📸 Fetching media for vendor:', vendorId);
+
+    // Fetch all media for this vendor
+    const media = await VendorMedia.find({ vendorId })
+      .sort({ orderIndex: 1, createdAt: -1 });
+
+    console.log(`✅ Found ${media.length} media items`);
+
+    res.json({
+      success: true,
+      data: media
+    });
+  } catch (error) {
+    console.error('❌ Error fetching vendor media:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch media',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Add media with Cloudinary URL (already uploaded)
+ * Used when frontend uploads directly to Cloudinary
+ */
+exports.addMedia = async (req, res) => {
+  try {
+    const vendorId = req.vendor?._id || req.user?._id;
+    const { url, publicId, type, caption } = req.body;
+    
+    if (!vendorId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Vendor ID not found. Please login again.'
+      });
+    }
+
+    if (!url || !publicId) {
+      return res.status(400).json({
+        success: false,
+        message: 'URL and publicId are required'
+      });
+    }
+
+    console.log('➕ Adding media for vendor:', vendorId);
+
+    // Check vendor plan limits
+    const vendor = await VendorNew.findById(vendorId);
+    const planType = vendor?.planType || 'free';
+    const limits = getVendorLimits(planType);
+    const mediaType = type || 'image';
+
+    // RULE 1: Free plan - Only images allowed
+    if (planType === 'free' && mediaType === 'video') {
+      return res.status(403).json({
+        success: false,
+        message: 'Video uploads are not available in the Free Plan. Upgrade to Starter Plan (₹499) or higher to upload videos.',
+        upgradeRequired: true,
+        currentPlan: limits.planName,
+        suggestedPlan: 'Starter Plan (₹499)'
+      });
+    }
+
+    // RULE 2: Check combined media count for all plans
+    const currentTotalCount = await VendorMedia.countDocuments({ vendorId });
+    
+    if (limits.portfolioLimit !== -1 && currentTotalCount >= limits.portfolioLimit) {
+      return res.status(403).json({
+        success: false,
+        message: `Portfolio limit reached (${currentTotalCount}/${limits.portfolioLimit}). Your ${limits.planName} allows ${limits.portfolioLimit} media items total. Upgrade to access more storage.`,
+        upgradeRequired: true,
+        currentPlan: limits.planName,
+        currentCount: currentTotalCount,
+        limit: limits.portfolioLimit,
+        suggestedPlan: planType === 'free' ? 'Starter Plan (₹499)' : 
+                       planType === 'starter' ? 'Growth Plan (₹999)' : 
+                       'Premium Plan (₹1499)'
+      });
+    }
+
+    // Determine order index (add to end)
+    const maxOrder = await VendorMedia.findOne({ vendorId })
+      .sort({ orderIndex: -1 })
+      .select('orderIndex');
+    const orderIndex = maxOrder ? maxOrder.orderIndex + 1 : 0;
+
+    // Create media record
+    const media = new VendorMedia({
+      vendorId,
+      type: type || 'image',
+      url,
+      publicId,
+      caption: caption || '',
+      orderIndex,
+      visibility: 'public',
+      approvalStatus: 'pending'
+    });
+
+    await media.save();
+    console.log('✅ Media added successfully:', media._id);
+
+    res.json({
+      success: true,
+      message: 'Media added successfully',
+      data: media
+    });
+  } catch (error) {
+    console.error('❌ Error adding media:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add media',
+      error: error.message
     });
   }
 };
@@ -359,7 +553,8 @@ exports.createBlog = async (req, res) => {
       content,
       tags: tags || [],
       status: status || 'draft',
-      coverImage: coverImage || {}
+      coverImage: coverImage || {},
+      approvalStatus: 'pending'
     });
 
     await blog.save();
@@ -476,7 +671,9 @@ exports.updateVendorProfile = async (req, res) => {
       facebook,
       yearsInBusiness,
       teamSize,
-      priceRange
+      priceRange,
+      profileImage,
+      coverImage
     } = req.body;
 
     // Find and update vendor
@@ -523,11 +720,32 @@ exports.updateVendorProfile = async (req, res) => {
       if (priceRange.max !== undefined) vendor.pricing.max = priceRange.max;
     }
 
+    // Update profile images (Cloudinary URLs)
+    if (profileImage !== undefined) {
+      vendor.profileImage = profileImage;
+      console.log('✅ Updated profile image:', profileImage.substring(0, 50) + '...');
+    }
+    if (coverImage !== undefined) {
+      vendor.coverImage = coverImage;
+      console.log('✅ Updated cover image:', coverImage.substring(0, 50) + '...');
+    }
+
     vendor.updatedAt = Date.now();
 
     await vendor.save();
 
     console.log('Profile updated successfully');
+    console.log('📸 Updated images AFTER SAVE:', {
+      profileImage: vendor.profileImage ? vendor.profileImage.substring(0, 50) + '...' : 'None',
+      coverImage: vendor.coverImage ? vendor.coverImage.substring(0, 50) + '...' : 'None'
+    });
+    
+    // Verify save worked by fetching again
+    const verifyVendor = await VendorNew.findById(vendorId).select('profileImage coverImage');
+    console.log('🔍 Verification from DB:', {
+      profileImage: verifyVendor.profileImage || 'None',
+      coverImage: verifyVendor.coverImage || 'None'
+    });
 
     res.json({
       success: true,
@@ -573,6 +791,10 @@ exports.getMyProfile = async (req, res) => {
     }
 
     console.log('✅ Vendor found:', vendor.businessName);
+    console.log('📸 Profile images:', {
+      profileImage: vendor.profileImage ? vendor.profileImage.substring(0, 50) + '...' : 'None',
+      coverImage: vendor.coverImage ? vendor.coverImage.substring(0, 50) + '...' : 'None'
+    });
 
     res.json({
       success: true,

@@ -3,7 +3,7 @@ import {
   Upload, X, Star, Eye, EyeOff, Image as ImageIcon, 
   Move, Check, Sparkles, AlertCircle
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../services/api';
 
 /**
  * VendorMediaManager Component
@@ -15,7 +15,9 @@ const VendorMediaManager = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [limits, setLimits] = useState(null);
-const [draggedItem, setDraggedItem] = useState(null);
+  const [planType, setPlanType] = useState('free');
+  const [currentUsage, setCurrentUsage] = useState({ portfolioCount: 0 });
+  const [draggedItem, setDraggedItem] = useState(null);
 
   useEffect(() => {
     fetchMedia();
@@ -24,15 +26,13 @@ const [draggedItem, setDraggedItem] = useState(null);
   const fetchMedia = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/vendor-profile/dashboard/me', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
-      });
+      const response = await apiClient.get('/vendor-profile/dashboard/me');
 
-      if (response.data.success) {
-        setMedia(response.data.data.media);
-        setLimits(response.data.data.limits);
+      if (response.success) {
+        setMedia(response.data.media);
+        setLimits(response.data.limits);
+        setPlanType(response.data.planType || 'free');
+        setCurrentUsage(response.data.currentUsage || { portfolioCount: 0 });
       }
     } catch (error) {
       console.error('Fetch media error:', error);
@@ -41,45 +41,119 @@ const [draggedItem, setDraggedItem] = useState(null);
     }
   };
 
+  const getRemainingUploads = () => {
+    if (!limits) return 0;
+    if (limits.portfolioLimit === -1) return Infinity;
+    return Math.max(0, limits.portfolioLimit - currentUsage.portfolioCount);
+  };
+
+  const canUpload = () => {
+    const remaining = getRemainingUploads();
+    return remaining === Infinity || remaining > 0;
+  };
+
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     // Check file size (max 10MB for images)
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB');
+      alert('⚠️ File size must be less than 10MB');
       return;
     }
 
-    // Check limits
-    if (limits && limits.portfolioLimit !== -1 && media.length >= limits.portfolioLimit) {
-      alert(`Portfolio limit reached. Your plan allows ${limits.portfolioLimit} images/videos.`);
+    // Check if upload is allowed
+    if (!canUpload()) {
+      const suggestedPlan = planType === 'free' ? 'Starter Plan (₹499)' :
+                           planType === 'starter' ? 'Growth Plan (₹999)' :
+                           'Premium Plan (₹1499)';
+      alert(
+        `🚨 Portfolio Limit Reached!\n\n` +
+        `Your ${limits?.planName || 'current plan'} allows ${limits?.portfolioLimit || 0} media items.\n` +
+        `You have used all ${currentUsage.portfolioCount} slots.\n\n` +
+        `⬆️ Upgrade to ${suggestedPlan} for more storage!`
+      );
+      e.target.value = ''; // Reset file input
+      return;
+    }
+
+    // Check file type
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      alert('⚠️ Please select an image or video file');
+      e.target.value = '';
+      return;
+    }
+
+    // Free plan restriction - NO videos allowed
+    if (planType === 'free' && isVideo) {
+      alert(
+        `📹 Video Upload Not Available\n\n` +
+        `Video uploads are not included in the Free Plan.\n\n` +
+        `⬆️ Upgrade to Starter Plan (₹499) to upload videos!`
+      );
+      e.target.value = '';
       return;
     }
 
     try {
       setUploading(true);
+      
+      // Step 1: Upload to Cloudinary directly from frontend
+      console.log('📤 Uploading to Cloudinary...');
+      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dgeiwz7gm';
+      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'blog_uploads';
+      
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('type', file.type.startsWith('video/') ? 'video' : 'image');
-      formData.append('caption', '');
-
-      const response = await axios.post('/api/vendor-profile/media', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', 'vendors/portfolio');
+      
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+      const uploadResponse = await fetch(cloudinaryUrl, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Cloudinary upload failed');
+      }
+      
+      const uploadData = await uploadResponse.json();
+      console.log('✅ Uploaded to Cloudinary:', uploadData.secure_url);
+      
+      // Step 2: Send URL to backend to save in database
+      const response = await apiClient.post('/vendor-profile/media', {
+        url: uploadData.secure_url,
+        publicId: uploadData.public_id,
+        type: file.type.startsWith('video/') ? 'video' : 'image',
+        caption: ''
       });
 
-      if (response.data.success) {
-        setMedia([...media, response.data.data]);
-        alert('Media uploaded successfully!');
+      if (response.success) {
+        // Refresh dashboard to get updated usage count
+        await fetchMedia();
+        alert('✅ Media uploaded successfully!');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert(error.response?.data?.message || 'Failed to upload media');
+      
+      // Handle plan limit errors with upgrade prompts
+      if (error.response?.data?.upgradeRequired) {
+        alert(
+          `🚨 ${error.response.data.message}\n\n` +
+          `📊 Current Plan: ${error.response.data.currentPlan}\n` +
+          `⬆️ Upgrade to: ${error.response.data.suggestedPlan}`
+        );
+      } else {
+        alert(error.response?.data?.message || error.message || 'Failed to upload media');
+      }
     } finally {
       setUploading(false);
+      // Reset file input
+      e.target.value = '';
     }
   };
 
@@ -87,14 +161,11 @@ const [draggedItem, setDraggedItem] = useState(null);
     if (!confirm('Are you sure you want to delete this media?')) return;
 
     try {
-      await axios.delete(`/api/vendor-profile/media/${mediaId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
-      });
+      await apiClient.delete(`/vendor-profile/media/${mediaId}`);
 
-      setMedia(media.filter(m => m._id !== mediaId));
-      alert('Media deleted successfully');
+      // Refresh to update count
+      await fetchMedia();
+      alert('✅ Media deleted successfully');
     } catch (error) {
       console.error('Delete error:', error);
       alert('Failed to delete media');
@@ -103,19 +174,14 @@ const [draggedItem, setDraggedItem] = useState(null);
 
   const handleToggleVisibility = async (mediaId) => {
     try {
-      const response = await axios.patch(
-        `/api/vendor-profile/media/${mediaId}/toggle-visibility`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-          }
-        }
+      const response = await apiClient.patch(
+        `/vendor-profile/media/${mediaId}/toggle-visibility`,
+        {}
       );
 
-      if (response.data.success) {
+      if (response.success) {
         setMedia(media.map(m => 
-          m._id === mediaId ? response.data.data : m
+          m._id === mediaId ? response.data : m
         ));
       }
     } catch (error) {
@@ -125,19 +191,14 @@ const [draggedItem, setDraggedItem] = useState(null);
 
   const handleToggleFeatured = async (mediaId) => {
     try {
-      const response = await axios.patch(
-        `/api/vendor-profile/media/${mediaId}/feature`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-          }
-        }
+      const response = await apiClient.patch(
+        `/vendor-profile/media/${mediaId}/feature`,
+        {}
       );
 
-      if (response.data.success) {
+      if (response.success) {
         setMedia(media.map(m => 
-          m._id === mediaId ? response.data.data : m
+          m._id === mediaId ? response.data : m
         ));
       }
     } catch (error) {
@@ -172,14 +233,9 @@ const [draggedItem, setDraggedItem] = useState(null);
     setMedia(newMedia);
 
     try {
-      await axios.put(
-        '/api/vendor-profile/media/reorder',
-        { mediaOrder },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-          }
-        }
+      await apiClient.put(
+        '/vendor-profile/media/reorder',
+        { mediaOrder }
       );
     } catch (error) {
       console.error('Reorder error:', error);
@@ -191,24 +247,78 @@ const [draggedItem, setDraggedItem] = useState(null);
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
+      {/* Plan Info Banner */}
+      {limits && (
+        <div className={`mb-6 p-4 rounded-lg border-2 ${
+          limits.portfolioLimit === -1 
+            ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
+            : getRemainingUploads() <= 2 && getRemainingUploads() > 0
+            ? 'bg-yellow-50 border-yellow-300'
+            : getRemainingUploads() === 0
+            ? 'bg-red-50 border-red-300'
+            : 'bg-blue-50 border-blue-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-1">
+                {limits.planName} {limits.planPrice && `(${limits.planPrice})`}
+              </h3>
+              <p className="text-sm text-gray-700">
+                {limits.portfolioLimit === -1 ? (
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    <strong>Unlimited</strong> portfolio uploads
+                  </span>
+                ) : (
+                  <span>
+                    <strong>{currentUsage.portfolioCount}</strong> of <strong>{limits.portfolioLimit}</strong> media used
+                    {getRemainingUploads() > 0 && (
+                      <span className="ml-2 text-gray-600">
+                        ({getRemainingUploads()} remaining)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </p>
+              {!limits.allowVideos && (
+                <p className="text-xs text-gray-600 mt-1">
+                  📷 Images only • Video uploads not available
+                </p>
+              )}
+            </div>
+            {getRemainingUploads() === 0 && (
+              <a 
+                href="#upgrade" 
+                className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all text-sm"
+              >
+                Upgrade Plan
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-1">Media Gallery</h2>
           <p className="text-sm text-gray-600">
-            {limits && limits.portfolioLimit !== -1
-              ? `${media.length} / ${limits.portfolioLimit} images uploaded`
-              : `${media.length} images uploaded`
-            }
+            {media.length} media items
           </p>
         </div>
-        <label className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 cursor-pointer transition-all shadow-md hover:shadow-lg flex items-center gap-2">
+        <label className={`px-6 py-3 font-semibold rounded-lg transition-all shadow-md flex items-center gap-2 ${
+          canUpload() && !uploading
+            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg cursor-pointer'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+        }`}>
           <Upload className="w-5 h-5" />
-          <span>{uploading ? 'Uploading...' : 'Upload Media'}</span>
+          <span>
+            {uploading ? 'Uploading...' : !canUpload() ? 'Limit Reached' : 'Upload Media'}
+          </span>
           <input
             type="file"
-            accept="image/*,video/*"
+            accept={limits?.allowVideos ? 'image/*,video/*' : 'image/*'}
             onChange={handleFileUpload}
-            disabled={uploading}
+            disabled={uploading || !canUpload()}
             className="hidden"
           />
         </label>

@@ -33,8 +33,11 @@ const inquirySchema = new mongoose.Schema({
     required: [true, 'Event type is required']
   },
   
+  // Structured eventDate { start, end }
+  // Accepts both legacy Date format and new {start, end} structure  
   eventDate: {
-    type: Date
+    type: mongoose.Schema.Types.Mixed,
+    default: undefined
   },
   
   budget: {
@@ -133,6 +136,23 @@ inquirySchema.index({ inquiryType: 1, createdAt: -1 });
 // Update timestamps on save
 inquirySchema.pre('save', function(next) {
   this.updatedAt = Date.now();
+  next();
+});
+
+// Migrate legacy eventDate values (single Date) to structured format on save
+inquirySchema.pre('save', function(next) {
+  try {
+    if (this.eventDate && this.eventDate instanceof Date) {
+      const d = this.eventDate;
+      this.eventDate = { start: d, end: d };
+    } else if (this.eventDate && (this.eventDate.start || this.eventDate.end)) {
+      const s = this.eventDate.start ? new Date(this.eventDate.start) : null;
+      const e = this.eventDate.end ? new Date(this.eventDate.end) : (s ? new Date(s) : null);
+      this.eventDate = s ? { start: s, end: e } : undefined;
+    }
+  } catch (err) {
+    console.warn('Error normalizing eventDate in Inquiry.pre.save', err);
+  }
   next();
 });
 

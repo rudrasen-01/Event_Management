@@ -31,6 +31,23 @@ const Header = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Open login modal if redirected from admin panel with query param
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const openLogin = params.get('openLogin');
+      if (openLogin && !isAuthenticated()) {
+        // open user login modal for admin sign-in
+        setShowUserLoginModal(true);
+        // remove the query param from URL without reloading
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [location.search]);
+
   const navItems = [
     { name: 'Home', href: '/', showForAdmin: false },
     { name: 'Search Events', href: '/search', showForAdmin: false },

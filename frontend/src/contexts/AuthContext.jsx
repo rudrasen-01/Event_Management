@@ -1,6 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// Use same API URL as api.js to ensure token consistency
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
@@ -24,12 +27,24 @@ export const AuthProvider = ({ children }) => {
         const storedToken = localStorage.getItem('authToken');
         const storedUser = localStorage.getItem('authUser');
 
+        console.log('🔐 Initializing auth...');
+        console.log('Token exists:', !!storedToken);
+        console.log('User exists:', !!storedUser);
+        
+        if (storedToken) {
+          console.log('Token preview:', storedToken.substring(0, 30) + '...');
+        }
+
         if (storedToken && storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          console.log('✅ Auth restored:', parsedUser.email, 'Role:', parsedUser.role);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setUser(parsedUser);
+        } else {
+          console.log('ℹ️ No stored auth found');
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('❌ Error initializing auth:', error);
         localStorage.removeItem('authToken');
         localStorage.removeItem('authUser');
       } finally {
@@ -43,7 +58,10 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:5000/api/users/login', {
+      console.log('🔐 Attempting login for:', email);
+      console.log('🌐 Using API URL:', API_BASE_URL);
+      
+      const response = await fetch(`${API_BASE_URL}/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -52,29 +70,37 @@ export const AuthProvider = ({ children }) => {
       });
 
       const data = await response.json();
+      console.log('📥 Login response:', data);
 
       if (!response.ok) {
         throw new Error(data.error?.message || 'Login failed');
       }
 
       // Store token and user data
-      localStorage.setItem('authToken', data.data.token);
-      localStorage.setItem('authUser', JSON.stringify(data.data.user));
+      const userToken = data.data.token;
+      const userData = data.data.user;
       
-      setToken(data.data.token);
-      setUser(data.data.user);
+      console.log('💾 Storing auth data...');
+      localStorage.setItem('authToken', userToken);
+      localStorage.setItem('authUser', JSON.stringify(userData));
+      
+      console.log('✅ Auth stored. User:', userData.email, 'Role:', userData.role);
+      
+      setToken(userToken);
+      setUser(userData);
 
       // Redirect based on role
-      if (data.data.user.role === 'admin') {
-        navigate('/admin');
+      if (userData.role === 'admin') {
+        console.log('🎯 Redirecting to admin panel...');
+        setTimeout(() => navigate('/admin'), 100); // Small delay to ensure state is set
       } else {
-        // Regular users stay on homepage (Flipkart/Amazon style)
+        console.log('🎯 Redirecting to home...');
         navigate('/');
       }
 
-      return { success: true, user: data.data.user };
+      return { success: true, user: userData };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       throw error;
     }
   };
@@ -82,7 +108,7 @@ export const AuthProvider = ({ children }) => {
   // Register function
   const register = async (name, email, password, phone) => {
     try {
-      const response = await fetch('http://localhost:5000/api/users/register', {
+      const response = await fetch(`${API_BASE_URL}/users/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -118,8 +144,8 @@ export const AuthProvider = ({ children }) => {
     try {
       // Determine the endpoint based on user type
       const endpoint = userType === 'vendor' 
-        ? 'http://localhost:5000/api/vendors/google-login'
-        : 'http://localhost:5000/api/users/google-login';
+        ? `${API_BASE_URL}/vendors/google-login`
+        : `${API_BASE_URL}/users/google-login`;
 
       const response = await fetch(endpoint, {
         method: 'POST',

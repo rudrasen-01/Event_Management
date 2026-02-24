@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const vendorReviewSchema = new mongoose.Schema({
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'VendorNew',
+    ref: 'Vendor',
     required: true,
     index: true
   },
@@ -42,6 +42,9 @@ const vendorReviewSchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
   },
+  rejectionReason: {
+    type: String
+  },
   vendorResponse: {
     comment: String,
     respondedAt: Date
@@ -60,8 +63,8 @@ const vendorReviewSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index to prevent duplicate reviews
-vendorReviewSchema.index({ vendorId: 1, userId: 1, verifiedInquiryId: 1 }, { unique: true });
+// Compound index to prevent duplicate reviews (removed verifiedInquiryId for simpler duplicate prevention)
+vendorReviewSchema.index({ vendorId: 1, userId: 1 }, { unique: true });
 vendorReviewSchema.index({ vendorId: 1, status: 1, createdAt: -1 });
 vendorReviewSchema.index({ userId: 1, createdAt: -1 });
 

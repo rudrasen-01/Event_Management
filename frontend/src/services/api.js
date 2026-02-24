@@ -4,9 +4,10 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance with default config
+// NOTE: increase timeout to 30s to avoid transient admin dashboard timeouts
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -15,23 +16,87 @@ const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    // Check both authToken (users/admins) and vendorToken (vendors)
+    const token = localStorage.getItem('authToken') || localStorage.getItem('vendorToken');
+    console.log('🔑 Request interceptor:', {
+      url: config.url,
+      hasToken: !!token,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
+    });
+    
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Token added to request headers');
+    } else {
+      console.warn('⚠️ No token found in localStorage for request to:', config.url);
     }
     return config;
   },
   (error) => {
+    console.error('❌ Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor for consistent error handling
 apiClient.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    // Always log responses for admin debugging
+    if (response.config.url?.includes('/admin/')) {
+      console.log('✅ API Response:', response.config.url, response.data);
+    }
+    return response.data;
+  },
   (error) => {
-    const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
-    console.error('API Error:', errorMessage);
+    // Enhanced error handling with detailed logging
+    const url = error.config?.url || 'unknown';
+    const status = error.response?.status;
+    const errorData = error.response?.data;
+    
+    console.error('❌ API Error:', {
+      url,
+      status,
+      message: errorData?.message || error.message,
+      error: errorData?.error
+    });
+    
+    // Handle authentication errors
+    if (status === 401) {
+      const errorMessage = errorData?.error?.message || errorData?.message || 'Authentication required';
+      const errorCode = errorData?.error?.code;
+      
+      console.error('🔒 Auth Error:', errorMessage, 'Code:', errorCode);
+      
+      // Only clear token and redirect on specific auth failures
+      // Don't auto-logout on every 401 - let the component handle it
+      if (errorCode === 'TOKEN_EXPIRED' || errorCode === 'INVALID_TOKEN') {
+        console.warn('⚠️ Token invalid, clearing auth state');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+        // Redirect to home instead of non-existent /login
+        if (!window.location.pathname.includes('/admin')) {
+          window.location.href = '/';
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
+    
+    // Handle forbidden errors
+    if (status === 403) {
+      const errorMessage = errorData?.error?.message || errorData?.message || 'Access forbidden';
+      console.error('🚫 Forbidden:', errorMessage);
+      
+      // If admin access denied, redirect to home
+      if (url.includes('/admin/') && !window.location.pathname.includes('/admin')) {
+        console.warn('⚠️ Admin access denied, redirecting to home');
+        window.location.href = '/';
+      }
+      
+      throw new Error(errorMessage);
+    }
+    
+    const errorMessage = errorData?.error?.message || errorData?.message || error.message || 'An error occurred';
     throw new Error(errorMessage);
   }
 );
@@ -256,11 +321,13 @@ export const deleteInquiry = async (inquiryId) => {
  */
 export const fetchPendingInquiries = async (params = {}) => {
   try {
+    console.log('📊 Fetching pending inquiries...');
     const queryParams = new URLSearchParams(params).toString();
     const response = await apiClient.get(`/admin/inquiries/pending?${queryParams}`);
-    return response.success ? response.data : { inquiries: [], total: 0 };
+    console.log('✅ Pending inquiries response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error fetching pending inquiries:', error);
+    console.error('❌ Error fetching pending inquiries:', error);
     throw error;
   }
 };
@@ -272,10 +339,12 @@ export const fetchPendingInquiries = async (params = {}) => {
  */
 export const approveInquiry = async (inquiryId) => {
   try {
+    console.log('✅ Approving inquiry:', inquiryId);
     const response = await apiClient.post(`/admin/inquiries/${inquiryId}/approve`);
-    return response.success ? response.data : null;
+    console.log('✅ Approve response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error approving inquiry:', error);
+    console.error('❌ Error approving inquiry:', error);
     throw error;
   }
 };
@@ -288,10 +357,12 @@ export const approveInquiry = async (inquiryId) => {
  */
 export const rejectInquiry = async (inquiryId, reason) => {
   try {
+    console.log('❌ Rejecting inquiry:', inquiryId, reason);
     const response = await apiClient.post(`/admin/inquiries/${inquiryId}/reject`, { reason });
-    return response.success ? response.data : null;
+    console.log('✅ Reject response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error rejecting inquiry:', error);
+    console.error('❌ Error rejecting inquiry:', error);
     throw error;
   }
 };
@@ -302,10 +373,12 @@ export const rejectInquiry = async (inquiryId, reason) => {
  */
 export const fetchInquiryApprovalStats = async () => {
   try {
+    console.log('📊 Fetching inquiry approval stats...');
     const response = await apiClient.get('/admin/inquiries/approval-stats');
-    return response.success ? response.data : { pending: 0, approved: 0, rejected: 0, total: 0 };
+    console.log('✅ Approval stats response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error fetching approval stats:', error);
+    console.error('❌ Error fetching approval stats:', error);
     throw error;
   }
 };
@@ -366,13 +439,31 @@ export const deleteVendor = async (vendorId) => {
  */
 export const fetchAdminStats = async () => {
   try {
-    const token = localStorage.getItem('authToken');
-    const response = await apiClient.get('/admin/stats', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.success ? response.data : null;
+    console.log('📊 Fetching admin stats...');
+    // Retry on timeout up to 2 times with small backoff
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await apiClient.get('/admin/stats', {
+          timeout: 30000
+        });
+        console.log('✅ Admin stats response:', response);
+        // Response interceptor already returns response.data
+        // Backend structure: { success: true, data: {...} }
+        return response && response.success ? response.data : response;
+      } catch (err) {
+        const msg = err.message || '';
+        console.error(`❌ Attempt ${attempt} failed:`, msg);
+        if (attempt === maxAttempts || !/timeout/i.test(msg)) {
+          throw err;
+        }
+        // small delay before retry
+        await new Promise(res => setTimeout(res, 500 * attempt));
+      }
+    }
+    return null;
   } catch (error) {
-    console.error('Error fetching admin stats:', error);
+    console.error('❌ Error fetching admin stats:', error);
     throw error;
   }
 };
@@ -384,13 +475,14 @@ export const fetchAdminStats = async () => {
  */
 export const fetchRecentActivity = async (limit = 10) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('📊 Fetching recent activity...');
     const response = await apiClient.get(`/admin/activity?limit=${limit}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+      timeout: 30000
     });
-    return response.success ? response.data : null;
+    console.log('✅ Recent activity response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error fetching recent activity:', error);
+    console.error('❌ Error fetching recent activity:', error);
     throw error;
   }
 };
@@ -402,14 +494,13 @@ export const fetchRecentActivity = async (limit = 10) => {
  */
 export const fetchAllUsers = async (params = {}) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('👥 Fetching all users...');
     const queryString = new URLSearchParams(params).toString();
-    const response = await apiClient.get(`/admin/users?${queryString}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.success ? response.data : null;
+    const response = await apiClient.get(`/admin/users?${queryString}`);
+    console.log('✅ Users response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.error('❌ Error fetching users:', error);
     throw error;
   }
 };
@@ -422,13 +513,12 @@ export const fetchAllUsers = async (params = {}) => {
  */
 export const updateUserStatus = async (userId, updates) => {
   try {
-    const token = localStorage.getItem('authToken');
-    const response = await apiClient.patch(`/admin/users/${userId}`, updates, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.success ? response.data : null;
+    console.log('✏️ Updating user status:', userId, updates);
+    const response = await apiClient.patch(`/admin/users/${userId}`, updates);
+    console.log('✅ Update user response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error updating user status:', error);
+    console.error('❌ Error updating user status:', error);
     throw error;
   }
 };
@@ -440,14 +530,14 @@ export const updateUserStatus = async (userId, updates) => {
  */
 export const fetchAllVendorsAdmin = async (params = {}) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('🏢 Fetching all vendors with params:', params);
     const queryString = new URLSearchParams(params).toString();
-    const response = await apiClient.get(`/admin/vendors?${queryString}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response;
+    const response = await apiClient.get(`/admin/vendors?${queryString}`);
+    console.log('✅ Vendors response:', response);
+    // Return consistent structure - response already has { success, data }
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error fetching vendors:', error);
+    console.error('❌ Error fetching vendors:', error);
     throw error;
   }
 };
@@ -459,13 +549,12 @@ export const fetchAllVendorsAdmin = async (params = {}) => {
  */
 export const fetchVendorByIdAdmin = async (vendorId) => {
   try {
-    const token = localStorage.getItem('authToken');
-    const response = await apiClient.get(`/admin/vendors/${vendorId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.success ? response.data : null;
+    console.log('🏢 Fetching vendor by ID:', vendorId);
+    const response = await apiClient.get(`/admin/vendors/${vendorId}`);
+    console.log('✅ Vendor response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error fetching vendor:', error);
+    console.error('❌ Error fetching vendor:', error);
     throw error;
   }
 };
@@ -478,15 +567,15 @@ export const fetchVendorByIdAdmin = async (vendorId) => {
  */
 export const toggleVendorVerification = async (vendorId, verified) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('✏️ Toggling vendor verification:', vendorId, verified);
     const response = await apiClient.patch(
       `/admin/vendors/${vendorId}/verify`,
-      { verified },
-      { headers: { 'Authorization': `Bearer ${token}` } }
+      { verified }
     );
-    return response.success ? response.data : null;
+    console.log('✅ Verification response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error toggling vendor verification:', error);
+    console.error('❌ Error toggling vendor verification:', error);
     throw error;
   }
 };
@@ -499,15 +588,15 @@ export const toggleVendorVerification = async (vendorId, verified) => {
  */
 export const toggleVendorStatus = async (vendorId, isActive) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('✏️ Toggling vendor status:', vendorId, isActive);
     const response = await apiClient.patch(
       `/admin/vendors/${vendorId}/status`,
-      { isActive },
-      { headers: { 'Authorization': `Bearer ${token}` } }
+      { isActive }
     );
-    return response.success ? response.data : null;
+    console.log('✅ Status response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error toggling vendor status:', error);
+    console.error('❌ Error toggling vendor status:', error);
     throw error;
   }
 };
@@ -519,13 +608,12 @@ export const toggleVendorStatus = async (vendorId, isActive) => {
  */
 export const deleteVendorPermanent = async (vendorId) => {
   try {
-    const token = localStorage.getItem('authToken');
-    const response = await apiClient.delete(`/admin/vendors/${vendorId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    console.log('🗑️ Deleting vendor:', vendorId);
+    const response = await apiClient.delete(`/admin/vendors/${vendorId}`);
+    console.log('✅ Delete response:', response);
     return response;
   } catch (error) {
-    console.error('Error deleting vendor:', error);
+    console.error('❌ Error deleting vendor:', error);
     throw error;
   }
 };
@@ -537,17 +625,24 @@ export const deleteVendorPermanent = async (vendorId) => {
  * @param {string} reason - Reason for forwarding
  * @returns {Promise<Object>} Updated inquiry
  */
+/**
+ * ADMIN: Forward inquiry to a different vendor
+ * @param {string} inquiryId - Inquiry ID
+ * @param {string} newVendorId - New vendor ID
+ * @param {string} reason - Reason for forwarding
+ * @returns {Promise<Object>} Updated inquiry
+ */
 export const forwardInquiry = async (inquiryId, newVendorId, reason) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('➡️ Forwarding inquiry:', inquiryId, 'to vendor:', newVendorId);
     const response = await apiClient.post(
       `/admin/inquiries/${inquiryId}/forward`,
-      { newVendorId, reason },
-      { headers: { 'Authorization': `Bearer ${token}` } }
+      { newVendorId, reason }
     );
-    return response;
+    console.log('✅ Forward response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error forwarding inquiry:', error);
+    console.error('❌ Error forwarding inquiry:', error);
     throw error;
   }
 };
@@ -558,17 +653,23 @@ export const forwardInquiry = async (inquiryId, newVendorId, reason) => {
  * @param {boolean} isActive - Active status
  * @returns {Promise<Object>} Updated inquiry
  */
+/**
+ * ADMIN: Toggle inquiry active status
+ * @param {string} inquiryId - Inquiry ID
+ * @param {boolean} isActive - Active status
+ * @returns {Promise<Object>} Updated inquiry
+ */
 export const toggleInquiryActive = async (inquiryId, isActive) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('✏️ Toggling inquiry active status:', inquiryId, isActive);
     const response = await apiClient.patch(
       `/admin/inquiries/${inquiryId}/toggle-active`,
-      { isActive },
-      { headers: { 'Authorization': `Bearer ${token}` } }
+      { isActive }
     );
-    return response;
+    console.log('✅ Toggle active response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error toggling inquiry status:', error);
+    console.error('❌ Error toggling inquiry status:', error);
     throw error;
   }
 };
@@ -580,14 +681,13 @@ export const toggleInquiryActive = async (inquiryId, isActive) => {
  */
 export const fetchAllInquiriesAdmin = async (params = {}) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('📧 Fetching all inquiries with params:', params);
     const queryString = new URLSearchParams(params).toString();
-    const response = await apiClient.get(`/admin/inquiries?${queryString}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return response.success ? response.data : null;
+    const response = await apiClient.get(`/admin/inquiries?${queryString}`);
+    console.log('✅ Inquiries response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error fetching inquiries:', error);
+    console.error('❌ Error fetching inquiries:', error);
     throw error;
   }
 };
@@ -600,15 +700,320 @@ export const fetchAllInquiriesAdmin = async (params = {}) => {
  */
 export const updateInquiryStatusAdmin = async (inquiryId, updates) => {
   try {
-    const token = localStorage.getItem('authToken');
+    console.log('✏️ Updating inquiry status:', inquiryId, updates);
     const response = await apiClient.patch(
       `/admin/inquiries/${inquiryId}`,
-      updates,
-      { headers: { 'Authorization': `Bearer ${token}` } }
+      updates
     );
-    return response.success ? response.data : null;
+    console.log('✅ Update inquiry response:', response);
+    return response && response.success ? response.data : response;
   } catch (error) {
-    console.error('Error updating inquiry:', error);
+    console.error('❌ Error updating inquiry:', error);
+    throw error;
+  }
+};
+
+/**
+ * ==========================================
+ * REVIEW MANAGEMENT (ADMIN)
+ * ==========================================
+ */
+
+/**
+ * Get all reviews with filters (Admin)
+ */
+export const fetchAllReviewsAdmin = async (params = {}) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.status && params.status !== 'all') queryParams.append('status', params.status);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    console.log('📋 Fetching all reviews (Admin):', queryParams.toString());
+    const response = await apiClient.get(`/admin/reviews?${queryParams.toString()}`);
+    console.log('✅ Reviews data received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching reviews:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get review statistics (Admin)
+ */
+export const fetchReviewStats = async () => {
+  try {
+    console.log('📊 Fetching review stats...');
+    const response = await apiClient.get('/admin/reviews/stats');
+    console.log('✅ Review stats received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching review stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get pending reviews (Admin)
+ */
+export const fetchPendingReviews = async () => {
+  try {
+    console.log('⏳ Fetching pending reviews...');
+    const response = await apiClient.get('/admin/reviews/pending');
+    console.log('✅ Pending reviews received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching pending reviews:', error);
+    throw error;
+  }
+};
+
+/**
+ * Approve a review (Admin)
+ */
+export const approveReviewAdmin = async (reviewId) => {
+  try {
+    console.log('✅ Approving review:', reviewId);
+    const response = await apiClient.post(`/admin/reviews/${reviewId}/approve`);
+    console.log('✅ Review approved:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error approving review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reject a review (Admin)
+ */
+export const rejectReviewAdmin = async (reviewId, reason) => {
+  try {
+    console.log('❌ Rejecting review:', reviewId);
+    const response = await apiClient.post(`/admin/reviews/${reviewId}/reject`, { reason });
+    console.log('✅ Review rejected:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error rejecting review:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a review (Admin)
+ */
+export const deleteReviewAdmin = async (reviewId) => {
+  try {
+    console.log('🗑️ Deleting review:', reviewId);
+    const response = await apiClient.delete(`/admin/reviews/${reviewId}`);
+    console.log('✅ Review deleted:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error deleting review:', error);
+    throw error;
+  }
+};
+
+/**
+ * ========================================
+ * MEDIA MANAGEMENT (Admin)
+ * ========================================
+ */
+
+/**
+ * Get all media with filters (Admin)
+ */
+export const fetchAllMediaAdmin = async (params = {}) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.approvalStatus && params.approvalStatus !== 'all') queryParams.append('approvalStatus', params.approvalStatus);
+    if (params.type && params.type !== 'all') queryParams.append('type', params.type);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    console.log('📸 Fetching all media (Admin):', queryParams.toString());
+    const response = await apiClient.get(`/admin/media?${queryParams.toString()}`);
+    console.log('✅ Media data received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching media:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get media statistics (Admin)
+ */
+export const fetchMediaStats = async () => {
+  try {
+    console.log('📊 Fetching media stats...');
+    const response = await apiClient.get('/admin/media/stats');
+    console.log('✅ Media stats received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching media stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get pending media (Admin)
+ */
+export const fetchPendingMedia = async () => {
+  try {
+    console.log('⏳ Fetching pending media...');
+    const response = await apiClient.get('/admin/media/pending');
+    console.log('✅ Pending media received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching pending media:', error);
+    throw error;
+  }
+};
+
+/**
+ * Approve media (Admin)
+ */
+export const approveMediaAdmin = async (mediaId) => {
+  try {
+    console.log('✅ Approving media:', mediaId);
+    const response = await apiClient.post(`/admin/media/${mediaId}/approve`);
+    console.log('✅ Media approved:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error approving media:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reject media (Admin)
+ */
+export const rejectMediaAdmin = async (mediaId, reason) => {
+  try {
+    console.log('❌ Rejecting media:', mediaId);
+    const response = await apiClient.post(`/admin/media/${mediaId}/reject`, { reason });
+    console.log('✅ Media rejected:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error rejecting media:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete media (Admin)
+ */
+export const deleteMediaAdmin = async (mediaId) => {
+  try {
+    console.log('🗑️ Deleting media:', mediaId);
+    const response = await apiClient.delete(`/admin/media/${mediaId}`);
+    console.log('✅ Media deleted:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error deleting media:', error);
+    throw error;
+  }
+};
+
+/**
+ * ========================================
+ * BLOG MANAGEMENT (Admin)
+ * ========================================
+ */
+
+/**
+ * Get all vendor blogs with filters (Admin)
+ */
+export const fetchAllBlogsAdmin = async (params = {}) => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.approvalStatus && params.approvalStatus !== 'all') queryParams.append('approvalStatus', params.approvalStatus);
+    if (params.status && params.status !== 'all') queryParams.append('status', params.status);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    
+    console.log('📝 Fetching all blogs (Admin):', queryParams.toString());
+    const response = await apiClient.get(`/admin/vendor-blogs?${queryParams.toString()}`);
+    console.log('✅ Blogs data received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching blogs:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get blog statistics (Admin)
+ */
+export const fetchBlogStats = async () => {
+  try {
+    console.log('📊 Fetching blog stats...');
+    const response = await apiClient.get('/admin/vendor-blogs/stats');
+    console.log('✅ Blog stats received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching blog stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get pending blogs (Admin)
+ */
+export const fetchPendingBlogs = async () => {
+  try {
+    console.log('⏳ Fetching pending blogs...');
+    const response = await apiClient.get('/admin/vendor-blogs/pending');
+    console.log('✅ Pending blogs received:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error fetching pending blogs:', error);
+    throw error;
+  }
+};
+
+/**
+ * Approve blog (Admin)
+ */
+export const approveBlogAdmin = async (blogId) => {
+  try {
+    console.log('✅ Approving blog:', blogId);
+    const response = await apiClient.post(`/admin/vendor-blogs/${blogId}/approve`);
+    console.log('✅ Blog approved:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error approving blog:', error);
+    throw error;
+  }
+};
+
+/**
+ * Reject blog (Admin)
+ */
+export const rejectBlogAdmin = async (blogId, reason) => {
+  try {
+    console.log('❌ Rejecting blog:', blogId);
+    const response = await apiClient.post(`/admin/vendor-blogs/${blogId}/reject`, { reason });
+    console.log('✅ Blog rejected:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error rejecting blog:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete blog (Admin)
+ */
+export const deleteBlogAdmin = async (blogId) => {
+  try {
+    console.log('🗑️ Deleting blog:', blogId);
+    const response = await apiClient.delete(`/admin/vendor-blogs/${blogId}`);
+    console.log('✅ Blog deleted:', response);
+    return response;
+  } catch (error) {
+    console.error('❌ Error deleting blog:', error);
     throw error;
   }
 };

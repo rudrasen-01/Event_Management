@@ -1,5 +1,6 @@
 const Vendor = require('../models/VendorNew');
 const Service = require('../models/Service');
+const VendorReview = require('../models/VendorReview');
 
 exports.loginVendor = async (req, res, next) => {
   try {
@@ -109,7 +110,8 @@ exports.registerVendor = async (req, res, next) => {
       yearsInBusiness,
       description,
       portfolio,
-      serviceAreas
+      serviceAreas,
+      photos // Cloudinary uploaded photos during registration
     } = req.body;
     
     // Validate password
@@ -278,6 +280,38 @@ exports.registerVendor = async (req, res, next) => {
     
     console.log(`✅ Vendor registered: ${vendor.name} at ${area}, ${city}`);
     
+    // ========================================================================
+    // CREATE VENDOR MEDIA ENTRIES for registration photos
+    // ========================================================================
+    const VendorMedia = require('../models/VendorMedia');
+    let uploadedMediaCount = 0;
+    
+    if (photos && Array.isArray(photos) && photos.length > 0) {
+      try {
+        console.log(`📸 Creating ${photos.length} media entries for vendor ${vendor._id}`);
+        
+        const mediaEntries = photos.map((photo, index) => ({
+          vendorId: vendor._id,
+          type: 'image',
+          url: photo.url,
+          publicId: photo.publicId,
+          caption: `Portfolio image ${index + 1}`,
+          orderIndex: index,
+          isFeatured: index === 0, // First image is featured
+          visibility: 'public',
+          metadata: photo.metadata || {}
+        }));
+        
+        const createdMedia = await VendorMedia.insertMany(mediaEntries);
+        uploadedMediaCount = createdMedia.length;
+        console.log(`✅ Created ${uploadedMediaCount} media entries`);
+        
+      } catch (mediaError) {
+        console.error(`⚠️  Failed to create media entries: ${mediaError.message}`);
+        // Don't fail registration if media creation fails
+      }
+    }
+    
     res.status(201).json({
       success: true,
       message: 'Vendor registration successful! Your profile is pending admin approval and will go live once verified.',
@@ -292,7 +326,8 @@ exports.registerVendor = async (req, res, next) => {
         },
         verified: vendor.verified,
         isActive: vendor.isActive,
-        status: 'pending_approval'
+        status: 'pending_approval',
+        mediaUploaded: uploadedMediaCount // Inform how many photos were saved
       }
     });
     
@@ -635,6 +670,118 @@ exports.rejectVendor = async (req, res, next) => {
       }
     });
     
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Submit a review for a vendor
+ * Reviews are pending until approved by admin
+ */
+exports.submitReview = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+    const { rating, comment } = req.body;
+    const userId = req.user?._id;
+
+    // Check if user is authenticated
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'You must be logged in to submit a review',
+          details: {}
+        }
+      });
+    }
+
+    // Validate rating
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_RATING',
+          message: 'Rating must be between 1 and 5',
+          details: {}
+        }
+      });
+    }
+
+    // Validate comment
+    if (!comment || comment.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COMMENT',
+          message: 'Review comment is required',
+          details: {}
+        }
+      });
+    }
+
+    if (comment.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'COMMENT_TOO_LONG',
+          message: 'Review comment must be less than 1000 characters',
+          details: {}
+        }
+      });
+    }
+
+    // Check if vendor exists (vendorId is MongoDB _id from URL params)
+    const vendor = await Vendor.findById(vendorId);
+    
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'VENDOR_NOT_FOUND',
+          message: 'Vendor not found',
+          details: { vendorId }
+        }
+      });
+    }
+
+    // Check if user has already reviewed this vendor
+    const existingReview = await VendorReview.findOne({ 
+      vendorId: vendor._id, 
+      userId 
+    });
+
+    if (existingReview) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'DUPLICATE_REVIEW',
+          message: 'You have already submitted a review for this vendor',
+          details: {}
+        }
+      });
+    }
+
+    // Create review with pending status
+    const review = await VendorReview.create({
+      vendorId: vendor._id,
+      userId,
+      rating,
+      comment: comment.trim(),
+      status: 'pending',
+      isVerified: false
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Review submitted successfully and is pending approval',
+      data: {
+        reviewId: review._id,
+        status: review.status
+      }
+    });
+
   } catch (error) {
     next(error);
   }

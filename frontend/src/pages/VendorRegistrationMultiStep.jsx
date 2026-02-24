@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle, Search, MapPin, Phone, Mail, Camera, Clock, 
   ChevronRight, ChevronLeft, Home, Building2, User, IndianRupee,
   Calendar, Shield, Check, AlertCircle, Zap, TrendingUp, Star,
   Award, Eye, Sparkles, Crown, CreditCard, Smartphone, Wallet,
-  Building, Lock, ArrowRight, Info
+  Building, Lock, ArrowRight, Info, Upload, X, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { getAllServices } from '../services/taxonomyService';
 import { fetchCities } from '../services/dynamicDataService';
 import VendorLoginModal from '../components/VendorLoginModal';
+import { uploadVendorImage } from '../services/vendorService';
 
 const VendorRegistrationMultiStep = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -22,6 +25,10 @@ const VendorRegistrationMultiStep = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [showManualCategory, setShowManualCategory] = useState(false);
+  
+  // Photo upload states
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Payment gateway state management
   const [paymentState, setPaymentState] = useState('idle'); // idle | initiating | processing | verifying | success | failed | cancelled
@@ -229,6 +236,83 @@ const VendorRegistrationMultiStep = () => {
         : [...prev.workingDays, day]
     }));
   };
+
+  // ==================== PHOTO UPLOAD HANDLERS ====================
+  const handlePhotoUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    // Validate total number of photos
+    const currentPhotos = formData.photos.length;
+    if (currentPhotos + files.length > 10) {
+      setError(`Maximum 10 photos allowed. You can upload ${10 - currentPhotos} more.`);
+      return;
+    }
+
+    setUploadingPhotos(true);
+    setUploadProgress(0);
+    const uploadedPhotos = [];
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          console.warn(`Skipping non-image file: ${file.name}`);
+          continue;
+        }
+
+        // Validate file size (max 5MB per image)
+        if (file.size > 5 * 1024 * 1024) {
+          setError(`${file.name} is too large. Maximum size is 5MB.`);
+          continue;
+        }
+
+        console.log(`📤 Uploading image ${i + 1}/${files.length}: ${file.name}`);
+        
+        try {
+          const result = await uploadVendorImage(file);
+          uploadedPhotos.push({
+            url: result.url,
+            publicId: result.publicId
+          });
+          
+          setUploadProgress(Math.round(((i + 1) / files.length) * 100));
+        } catch (uploadError) {
+          console.error(`❌ Failed to upload ${file.name}:`, uploadError);
+          setError(`Failed to upload ${file.name}. Please try again.`);
+        }
+      }
+
+      // Add uploaded photos to formData
+      if (uploadedPhotos.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          photos: [...prev.photos, ...uploadedPhotos]
+        }));
+        console.log(`✅ Successfully uploaded ${uploadedPhotos.length} photos`);
+      }
+    } catch (error) {
+      console.error('❌ Photo upload error:', error);
+      setError(error.message || 'Failed to upload photos');
+    } finally {
+      setUploadingPhotos(false);
+      setUploadProgress(0);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemovePhoto = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index)
+    }));
+  };
+
 
   const validateStep = (step) => {
     console.log('\n🔍 ========== VALIDATION START ==========');
@@ -482,7 +566,7 @@ const VendorRegistrationMultiStep = () => {
       const payload = {
         name: formData.contactPerson.trim(),
         businessName: formData.businessName.trim(),
-      serviceType: formData.serviceType || formData.customService.trim(),
+        serviceType: formData.serviceType || formData.customService.trim(),
         location: {
           type: 'Point',
           coordinates: [lng, lat]
@@ -509,8 +593,11 @@ const VendorRegistrationMultiStep = () => {
         },
         password: formData.password,
         yearsInBusiness: formData.yearsInBusiness ? Number(formData.yearsInBusiness) : undefined,
-        description: formData.description.trim() || undefined
+        description: formData.description.trim() || undefined,
+        photos: formData.photos || [] // Include uploaded Cloudinary photos
       };
+
+      console.log('📤 Registration payload:', { ...payload, password: '***' });
 
       const response = await fetch('http://localhost:5000/api/vendors/register', {
         method: 'POST',
@@ -522,6 +609,11 @@ const VendorRegistrationMultiStep = () => {
 
       if (!response.ok) {
         throw new Error(data.error?.message || data.message || 'Registration failed');
+      }
+
+      console.log('✅ Vendor registration successful:', data);
+      if (data.data?.mediaUploaded) {
+        console.log(`📸 ${data.data.mediaUploaded} photos uploaded successfully`);
       }
 
       setSuccess(true);
@@ -1236,13 +1328,77 @@ const VendorRegistrationMultiStep = () => {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900 mb-1">Business Photos (Optional)</h2>
-                  <p className="text-sm text-gray-600">Add photos to showcase your work</p>
+                  <p className="text-sm text-gray-600">Add up to 10 photos to showcase your work</p>
                 </div>
 
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-                  <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-600 mb-2">Photo upload coming soon</p>
-                  <p className="text-xs text-gray-500">You can add photos later from your dashboard</p>
+                {/* Photo Upload Area */}
+                <div className="space-y-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                  
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingPhotos || formData.photos.length >= 10}
+                    className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-500 hover:bg-indigo-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingPhotos ? (
+                      <div className="space-y-3">
+                        <Loader2 className="w-12 h-12 text-indigo-600 mx-auto animate-spin" />
+                        <p className="text-sm text-gray-600">Uploading... {uploadProgress}%</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-indigo-600 h-2 rounded-full transition-all"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          {formData.photos.length >= 10 
+                            ? 'Maximum 10 photos uploaded'
+                            : 'Click to upload photos or drag and drop'
+                          }
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          PNG, JPG up to 5MB each • {formData.photos.length}/10 uploaded
+                        </p>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Photo Grid */}
+                  {formData.photos.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {formData.photos.map((photo, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={photo.url}
+                            alt={`Photo ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(index)}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                            Photo {index + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

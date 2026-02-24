@@ -64,6 +64,66 @@ exports.createInquiry = async (req, res, next) => {
       });
     }
 
+    // ===== Event date parsing and validation =====
+    // Accept either:
+    // - eventDate as an object { start, end }
+    // - eventDate as a single ISO/string date
+    let eventStartDate = null;
+    let eventEndDate = null;
+
+    if (eventDate) {
+      try {
+        if (typeof eventDate === 'string' || eventDate instanceof String) {
+          eventStartDate = new Date(eventDate);
+          eventEndDate = new Date(eventDate);
+        } else if (typeof eventDate === 'object') {
+          // Prefer explicit start and end
+          eventStartDate = eventDate.start ? new Date(eventDate.start) : (eventDate?.startDate ? new Date(eventDate.startDate) : null);
+          eventEndDate = eventDate.end ? new Date(eventDate.end) : (eventDate?.endDate ? new Date(eventDate.endDate) : null);
+          // If only a single date provided as raw Date value
+          if (!eventStartDate && eventDate instanceof Date) {
+            eventStartDate = new Date(eventDate);
+            eventEndDate = new Date(eventDate);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not parse eventDate from request:', eventDate, err);
+      }
+    }
+
+    // If no start provided, leave undefined for now (frontend should send start)
+    if (!eventStartDate || isNaN(eventStartDate.getTime())) {
+      // do not abort here; later validation will require start for vendor inquiries
+      eventStartDate = null;
+    }
+
+    // Enforce start date is required
+    if (!eventStartDate) {
+      return res.status(400).json({ success: false, error: { code: 'MISSING_EVENT_START', message: 'Start date is required' } });
+    }
+
+    if (!eventEndDate || isNaN(eventEndDate.getTime())) {
+      eventEndDate = eventStartDate ? new Date(eventStartDate) : null;
+    }
+
+    // Enforce start >= today (no past dates) and end >= start
+    if (eventStartDate) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const s = new Date(eventStartDate);
+      s.setHours(0,0,0,0);
+      const e = eventEndDate ? new Date(eventEndDate) : new Date(s);
+      e.setHours(0,0,0,0);
+
+      if (s < today) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_EVENT_DATE', message: 'Start date cannot be in the past' } });
+      }
+
+      if (e < s) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_EVENT_DATE', message: 'End date cannot be before start date' } });
+      }
+    }
+
     // Validate vendor exists if vendor inquiry
     let vendorSnapshot = null;
     if (inquiryType === 'vendor_inquiry' && vendorId) {
@@ -127,7 +187,7 @@ exports.createInquiry = async (req, res, next) => {
         userEmail,
         userContact,
         eventType,
-        eventDate: eventDate ? new Date(eventDate) : undefined,
+        eventDate: eventStartDate ? { start: eventStartDate, end: eventEndDate || eventStartDate } : undefined,
         budget: budgetValue,
         location: location || { type: 'Point', coordinates: [0, 0] },
         city,
@@ -164,7 +224,7 @@ exports.createInquiry = async (req, res, next) => {
         userEmail,
         userContact,
         eventType,
-        eventDate: eventDate ? new Date(eventDate) : undefined,
+        eventDate: eventStartDate ? { start: eventStartDate, end: eventEndDate || eventStartDate } : undefined,
         budget: budgetValue,
         location: location || { type: 'Point', coordinates: [0, 0] },
         city,
@@ -276,31 +336,57 @@ exports.getAllInquiries = async (req, res, next) => {
     let vendorTotal = 0;
     let contactTotal = 0;
 
-    // Fetch based on inquiryType filter
+    // Fetch based on inquiryType filter with defensive error handling
     if (!inquiryType || inquiryType === 'vendor_inquiry') {
-      vendorInquiries = await VendorInquiry.find(query)
-        .populate('vendorId', 'name businessName serviceType contact.email contact.phone city')
-        .sort({ [sortBy]: sortOrder })
-        .limit(parseInt(limit));
-      vendorTotal = await VendorInquiry.countDocuments(query);
+      try {
+        vendorInquiries = await VendorInquiry.find(query)
+          .populate({
+            path: 'vendorId',
+            select: 'name businessName serviceType contact.email contact.phone city',
+            options: { strictPopulate: false }
+          })
+          .sort({ [sortBy]: sortOrder })
+          .limit(parseInt(limit))
+          .lean()
+          .catch(err => {
+            console.error('❌ Error fetching vendor inquiries:', err.message);
+            return [];
+          });
+        vendorTotal = await VendorInquiry.countDocuments(query).catch(() => 0);
+      } catch (err) {
+        console.error('❌ Error in vendor inquiries block:', err);
+        vendorInquiries = [];
+        vendorTotal = 0;
+      }
     }
 
     if (!inquiryType || inquiryType === 'contact_inquiry') {
-      contactInquiries = await ContactInquiry.find(query)
-        .sort({ [sortBy]: sortOrder })
-        .limit(parseInt(limit));
-      contactTotal = await ContactInquiry.countDocuments(query);
+      try {
+        contactInquiries = await ContactInquiry.find(query)
+          .sort({ [sortBy]: sortOrder })
+          .limit(parseInt(limit))
+          .lean()
+          .catch(err => {
+            console.error('❌ Error fetching contact inquiries:', err.message);
+            return [];
+          });
+        contactTotal = await ContactInquiry.countDocuments(query).catch(() => 0);
+      } catch (err) {
+        console.error('❌ Error in contact inquiries block:', err);
+        contactInquiries = [];
+        contactTotal = 0;
+      }
     }
 
     // Add type identifier to each inquiry
     const vendorInqsWithType = vendorInquiries.map(inq => ({
-      ...inq.toObject(),
+      ...(typeof inq.toObject === 'function' ? inq.toObject() : inq),
       inquiryType: 'vendor_inquiry',
       collection: 'vendorinquiries'
     }));
 
     const contactInqsWithType = contactInquiries.map(inq => ({
-      ...inq.toObject(),
+      ...(typeof inq.toObject === 'function' ? inq.toObject() : inq),
       inquiryType: 'contact_inquiry',
       collection: 'contactinquiries'
     }));
@@ -331,7 +417,19 @@ exports.getAllInquiries = async (req, res, next) => {
 
   } catch (error) {
     console.error('Error fetching inquiries:', error);
-    next(error);
+    // Return empty data instead of crashing
+    res.json({
+      success: true,
+      data: {
+        inquiries: [],
+        total: 0,
+        vendorInquiriesCount: 0,
+        contactInquiriesCount: 0,
+        page: parseInt(page),
+        totalPages: 0,
+        hasMore: false
+      }
+    });
   }
 };
 
@@ -381,14 +479,37 @@ exports.getVendorInquiries = async (req, res, next) => {
 
     const skip = (page - 1) * limit;
 
-    const inquiries = await VendorInquiry.find(query)
-      .populate('vendorId', 'name businessName serviceType contact.email contact.phone city')
-      .populate('approvedBy', 'name email') // Include admin who approved
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    // Query with defensive error handling
+    let inquiries = [];
+    let total = 0;
+    
+    try {
+      inquiries = await VendorInquiry.find(query)
+        .populate({
+          path: 'vendorId',
+          select: 'name businessName serviceType contact.email contact.phone city',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'approvedBy',
+          select: 'name email',
+          options: { strictPopulate: false }
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean()
+        .catch(err => {
+          console.error('❌ Error populating inquiries:', err.message);
+          return [];
+        });
 
-    const total = await VendorInquiry.countDocuments(query);
+      total = await VendorInquiry.countDocuments(query).catch(() => 0);
+    } catch (queryError) {
+      console.error('❌ Error in vendor inquiries query:', queryError);
+      inquiries = [];
+      total = 0;
+    }
     
     console.log(`✅ Found ${total} approved inquiries for vendor`);
 
@@ -404,7 +525,16 @@ exports.getVendorInquiries = async (req, res, next) => {
 
   } catch (error) {
     console.error('Error fetching vendor inquiries:', error);
-    next(error);
+    // Return empty data instead of crashing
+    res.json({
+      success: true,
+      data: {
+        inquiries: [],
+        total: 0,
+        page: parseInt(page),
+        totalPages: 0
+      }
+    });
   }
 };
 

@@ -3,7 +3,7 @@ import {
   Plus, Edit, Trash2, Eye, FileText, Save, X, 
   Image as ImageIcon, Send, Clock, Tag
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../services/api';
 
 /**
  * VendorBlogManager Component
@@ -29,14 +29,10 @@ const VendorBlogManager = () => {
   const fetchBlogs = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/vendor-profile/dashboard/me', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
-      });
+      const response = await apiClient.get('/vendor-profile/dashboard/me');
 
-      if (response.data.success) {
-        setBlogs(response.data.data.blogs);
+      if (response.success) {
+        setBlogs(response.data.blogs);
       }
     } catch (error) {
       console.error('Fetch blogs error:', error);
@@ -73,28 +69,18 @@ const VendorBlogManager = () => {
 
       let response;
       if (editingBlog) {
-        response = await axios.put(
-          `/api/vendor-profile/blogs/${editingBlog._id}`,
-          blogData,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-            }
-          }
+        response = await apiClient.put(
+          `/vendor-profile/blogs/${editingBlog._id}`,
+          blogData
         );
       } else {
-        response = await axios.post(
-          '/api/vendor-profile/blogs',
-          blogData,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-            }
-          }
+        response = await apiClient.post(
+          '/vendor-profile/blogs',
+          blogData
         );
       }
 
-      if (response.data.success) {
+      if (response.success) {
         alert(editingBlog ? 'Blog updated successfully!' : 'Blog created successfully!');
         fetchBlogs();
         setShowEditor(false);
@@ -109,11 +95,7 @@ const VendorBlogManager = () => {
     if (!confirm('Are you sure you want to delete this blog?')) return;
 
     try {
-      await axios.delete(`/api/vendor-profile/blogs/${blogId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
-      });
+      await apiClient.delete(`/vendor-profile/blogs/${blogId}`);
 
       setBlogs(blogs.filter(b => b._id !== blogId));
       alert('Blog deleted successfully');
@@ -125,17 +107,12 @@ const VendorBlogManager = () => {
 
   const handlePublish = async (blogId) => {
     try {
-      const response = await axios.patch(
-        `/api/vendor-profile/blogs/${blogId}/publish`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-          }
-        }
+      const response = await apiClient.patch(
+        `/vendor-profile/blogs/${blogId}/publish`,
+        {}
       );
 
-      if (response.data.success) {
+      if (response.success) {
         alert('Blog published successfully!');
         fetchBlogs();
       }

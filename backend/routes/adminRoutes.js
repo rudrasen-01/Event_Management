@@ -230,4 +230,148 @@ router.delete('/blogs/:id', blogController.deleteBlog);
  */
 router.patch('/blogs/:id/toggle-publish', blogController.togglePublish);
 
+/**
+ * ==========================================
+ * REVIEW MANAGEMENT ROUTES
+ * ==========================================
+ */
+
+/**
+ * @route   GET /api/admin/reviews/stats
+ * @desc    Get review statistics
+ * @access  Admin
+ */
+router.get('/reviews/stats', adminController.getReviewStats);
+
+/**
+ * @route   GET /api/admin/reviews/pending
+ * @desc    Get all pending reviews
+ * @access  Admin
+ */
+router.get('/reviews/pending', adminController.getPendingReviews);
+
+/**
+ * @route   GET /api/admin/reviews
+ * @desc    Get all reviews with filters
+ * @access  Admin
+ */
+router.get('/reviews', adminController.getAllReviews);
+
+/**
+ * @route   POST /api/admin/reviews/:reviewId/approve
+ * @desc    Approve a review
+ * @access  Admin
+ */
+router.post('/reviews/:reviewId/approve', adminController.approveReview);
+
+/**
+ * @route   POST /api/admin/reviews/:reviewId/reject
+ * @desc    Reject a review
+ * @access  Admin
+ */
+router.post('/reviews/:reviewId/reject', adminController.rejectReview);
+
+/**
+ * @route   DELETE /api/admin/reviews/:reviewId
+ * @desc    Delete a review
+ * @access  Admin
+ */
+router.delete('/reviews/:reviewId', adminController.deleteReview);
+
+/**
+ * ==========================================
+ * MEDIA MANAGEMENT ROUTES
+ * ==========================================
+ */
+
+/**
+ * @route   GET /api/admin/media/stats
+ * @desc    Get media statistics
+ * @access  Admin
+ */
+router.get('/media/stats', adminController.getMediaStats);
+
+/**
+ * @route   GET /api/admin/media/pending
+ * @desc    Get all pending media
+ * @access  Admin
+ */
+router.get('/media/pending', adminController.getPendingMedia);
+
+/**
+ * @route   GET /api/admin/media
+ * @desc    Get all media with filters
+ * @access  Admin
+ */
+router.get('/media', adminController.getAllMedia);
+
+/**
+ * @route   POST /api/admin/media/:mediaId/approve
+ * @desc    Approve media
+ * @access  Admin
+ */
+router.post('/media/:mediaId/approve', adminController.approveMedia);
+
+/**
+ * @route   POST /api/admin/media/:mediaId/reject
+ * @desc    Reject media
+ * @access  Admin
+ */
+router.post('/media/:mediaId/reject', adminController.rejectMedia);
+
+/**
+ * @route   DELETE /api/admin/media/:mediaId
+ * @desc    Delete media
+ * @access  Admin
+ */
+router.delete('/media/:mediaId', adminController.deleteMedia);
+
+/**
+ * ==========================================
+ * BLOG APPROVAL MANAGEMENT ROUTES
+ * ==========================================
+ */
+
+/**
+ * @route   GET /api/admin/vendor-blogs/stats
+ * @desc    Get vendor blog statistics
+ * @access  Admin
+ */
+router.get('/vendor-blogs/stats', adminController.getBlogStats);
+
+/**
+ * @route   GET /api/admin/vendor-blogs/pending
+ * @desc    Get all pending vendor blogs
+ * @access  Admin
+ */
+router.get('/vendor-blogs/pending', adminController.getPendingBlogs);
+
+/**
+ * @route   GET /api/admin/vendor-blogs
+ * @desc    Get all vendor blogs with filters
+ * @access  Admin
+ */
+router.get('/vendor-blogs', adminController.getAllBlogs);
+
+/**
+ * @route   POST /api/admin/vendor-blogs/:blogId/approve
+ * @desc    Approve vendor blog
+ * @access  Admin
+ */
+router.post('/vendor-blogs/:blogId/approve', adminController.approveBlog);
+
+/**
+ * @route   POST /api/admin/vendor-blogs/:blogId/reject
+ * @desc    Reject vendor blog
+ * @access  Admin
+ */
+router.post('/vendor-blogs/:blogId/reject', adminController.rejectBlog);
+
+/**
+ * @route   DELETE /api/admin/vendor-blogs/:blogId
+ * @desc    Delete vendor blog
+ * @access  Admin
+ */
+router.delete('/vendor-blogs/:blogId', adminController.deleteBlog);
+
 module.exports = router;

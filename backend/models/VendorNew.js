@@ -191,6 +191,17 @@ const vendorSchema = new mongoose.Schema({
     default: ''
   },
   
+  // Profile Images (Cloudinary URLs)
+  profileImage: {
+    type: String,
+    default: ''
+  },
+  
+  coverImage: {
+    type: String,
+    default: ''
+  },
+  
   // Contact Information
   contact: {
     type: contactSchema,

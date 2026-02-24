@@ -53,25 +53,29 @@ router.put('/profile/update', vendorProtect, vendorProfileController.updateVendo
 router.get('/dashboard/me', vendorProtect, vendorProfileController.getVendorDashboard);
 
 // ========================================
-// PUBLIC ROUTES
-// ========================================
-
-/**
- * GET /api/vendor-profile/:vendorId
- * Get complete public vendor profile
- */
-router.get('/:vendorId', vendorProfileController.getVendorProfile);
-
-// ========================================
 // MEDIA MANAGEMENT
 // ========================================
 
 /**
- * POST /api/vendor-profile/media
- * Upload new media (image or video)
- * Requires: file upload
+ * GET /api/vendor-profile/media
+ * Get vendor's portfolio media (photos/videos)
  */
-router.post('/media', vendorProtect, upload.single('file'), vendorProfileController.uploadMedia);
+router.get('/media', vendorProtect, vendorProfileController.getVendorMedia);
+
+/**
+ * POST /api/vendor-profile/media
+ * Add media - supports two methods:
+ * 1. With file upload (multipart/form-data)
+ * 2. With Cloudinary URL in body (application/json)
+ */
+router.post('/media', vendorProtect, upload.single('file'), (req, res, next) => {
+  // If file uploaded, use uploadMedia; otherwise use addMedia
+  if (req.file) {
+    vendorProfileController.uploadMedia(req, res, next);
+  } else {
+    vendorProfileController.addMedia(req, res, next);
+  }
+});
 
 /**
  * DELETE /api/vendor-profile/media/:mediaId
@@ -110,16 +114,25 @@ router.patch('/media/:mediaId/toggle-visibility', vendorProtect, async (req, res
 
     res.json({
       success: true,
-      message: 'Media visibility updated',
       data: media
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Failed to update visibility'
+      message: 'Failed to toggle visibility'
     });
   }
 });
+
+// ========================================
+// PUBLIC ROUTES
+// ========================================
+
+/**
+ * GET /api/vendor-profile/:vendorId
+ * Get complete public vendor profile
+ */
+router.get('/:vendorId', vendorProfileController.getVendorProfile);
 
 /**
  * PATCH /api/vendor-profile/media/:mediaId/feature
@@ -220,7 +233,9 @@ router.patch('/blogs/:blogId/publish', vendorProtect, async (req, res) => {
 
 /**
  * POST /api/vendor-profile/videos
- * Upload new video
+ * Upload new video - supports two methods:
+ * 1. With file upload (multipart/form-data)
+ * 2. With Cloudinary URL in body (application/json)
  */
 router.post('/videos', vendorProtect, upload.single('media'), async (req, res) => {
   try {
@@ -229,15 +244,7 @@ router.post('/videos', vendorProtect, upload.single('media'), async (req, res) =
     const { uploadVideo } = require('../utils/cloudinaryHelper');
     
     const vendorId = req.vendor._id;
-    const { title, description } = req.body;
     const file = req.file;
-
-    if (!file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No video file provided'
-      });
-    }
 
     // Check limits
     const vendor = await VendorNew.findById(vendorId);
@@ -254,28 +261,65 @@ router.post('/videos', vendorProtect, upload.single('media'), async (req, res) =
       });
     }
 
-    // Upload to Cloudinary
-    const uploadResult = await uploadVideo(file.buffer || file.path);
+    let videoData;
+
+    // Method 1: File uploaded (legacy backend upload)
+    if (file) {
+      const { title, description } = req.body;
+      
+      // Upload to Cloudinary
+      const uploadResult = await uploadVideo(file.buffer || file.path);
+
+      videoData = {
+        vendorId,
+        videoUrl: uploadResult.url,
+        publicId: uploadResult.publicId,
+        title: title || 'Untitled Video',
+        description: description || '',
+        duration: uploadResult.duration,
+        thumbnail: {
+          url: uploadResult.thumbnail
+        },
+        metadata: {
+          width: uploadResult.width,
+          height: uploadResult.height,
+          format: uploadResult.format,
+          size: uploadResult.size
+        }
+      };
+    } 
+    // Method 2: Pre-uploaded URL provided (frontend upload)
+    else {
+      const { url, publicId, title, description, thumbnail, duration, width, height, format, size } = req.body;
+      
+      if (!url || !publicId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Either provide a video file or URL with publicId'
+        });
+      }
+
+      videoData = {
+        vendorId,
+        videoUrl: url,
+        publicId,
+        title: title || 'Untitled Video',
+        description: description || '',
+        duration: duration || 0,
+        thumbnail: {
+          url: thumbnail || url.replace(/\.(mp4|mov|avi|webm)$/, '.jpg')
+        },
+        metadata: {
+          width: width || 0,
+          height: height || 0,
+          format: format || 'video',
+          size: size || 0
+        }
+      };
+    }
 
     // Create video record
-    const video = new VendorVideo({
-      vendorId,
-      videoUrl: uploadResult.url,
-      publicId: uploadResult.publicId,
-      title: title || 'Untitled Video',
-      description: description || '',
-      duration: uploadResult.duration,
-      thumbnail: {
-        url: uploadResult.thumbnail
-      },
-      metadata: {
-        width: uploadResult.width,
-        height: uploadResult.height,
-        format: uploadResult.format,
-        size: uploadResult.size
-      }
-    });
-
+    const video = new VendorVideo(videoData);
     await video.save();
 
     res.status(201).json({
@@ -287,7 +331,7 @@ router.post('/videos', vendorProtect, upload.single('media'), async (req, res) =
     console.error('Upload video error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to upload video'
+      message: error.message || 'Failed to upload video'
     });
   }
 });
