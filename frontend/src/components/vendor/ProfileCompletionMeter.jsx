@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, Circle, TrendingUp, Award, AlertCircle } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../services/api';
 
 /**
  * ProfileCompletionMeter Component
@@ -19,15 +19,11 @@ const ProfileCompletionMeter = () => {
   const fetchProfileCompletion = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/vendor-profile/dashboard/me', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
-      });
+      const response = await apiClient.get('/vendor-profile/dashboard/me');
 
-      if (response.data.success) {
-        setCompletion(response.data.data.profileCompletion);
-        setProfile(response.data.data);
+      if (response.success) {
+        setCompletion(response.data.profileCompletion);
+        setProfile(response.data);
       }
     } catch (error) {
       console.error('Fetch profile completion error:', error);

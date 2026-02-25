@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const vendorMediaSchema = new mongoose.Schema({
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'VendorNew',
+    ref: 'Vendor',
     required: true,
     index: true
   },
@@ -44,6 +44,15 @@ const vendorMediaSchema = new mongoose.Schema({
     enum: ['public', 'hidden'],
     default: 'public'
   },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    index: true
+  },
+  rejectionReason: {
+    type: String
+  },
   tags: [{
     type: String,
     trim: true
@@ -59,9 +68,10 @@ const vendorMediaSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-vendorMediaSchema.index({ vendorId: 1, visibility: 1, orderIndex: 1 });
+vendorMediaSchema.index({ vendorId: 1, visibility: 1, approvalStatus: 1, orderIndex: 1 });
 vendorMediaSchema.index({ vendorId: 1, type: 1 });
 vendorMediaSchema.index({ vendorId: 1, isFeatured: -1 });
+vendorMediaSchema.index({ approvalStatus: 1, createdAt: -1 });
 
 // Virtual for thumbnail URL (can be used for videos)
 vendorMediaSchema.virtual('thumbnailUrl').get(function() {

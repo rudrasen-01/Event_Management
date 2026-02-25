@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Auth Token</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        pre { background: #272822; color: #f8f8f2; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .error { color: #f44336; }
+        .success { color: #4CAF50; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Admin Token Debugger</h1>
+        
+        <h2>Step 1: Check Token</h2>
+        <button onclick="checkToken()">Check Token</button>
+        <pre id="tokenOutput"></pre>
+
+        <h2>Step 2: Decode Token</h2>
+        <button onclick="decodeToken()">Decode JWT</button>
+        <pre id="decodeOutput"></pre>
+
+        <h2>Step 3: Test API Call</h2>
+        <button onclick="testAPI()">Test /admin/stats</button>
+        <pre id="apiOutput"></pre>
+    </div>
+
+    <script>
+        function checkToken() {
+            const token = localStorage.getItem('authToken');
+            const user = localStorage.getItem('authUser');
+            const output = document.getElementById('tokenOutput');
+            
+            if (!token) {
+                output.innerHTML = '<span class="error">❌ No authToken found in localStorage!</span>\n\n' +
+                    'Available keys:\n' + Object.keys(localStorage).join('\n');
+                return;
+            }
+            
+            output.innerHTML = '<span class="success">✅ Token found</span>\n\n' +
+                'Token (first 50 chars): ' + token.substring(0, 50) + '...\n\n' +
+                'User data:\n' + (user ? JSON.stringify(JSON.parse(user), null, 2) : 'None');
+        }
+
+        function decodeToken() {
+            const token = localStorage.getItem('authToken');
+            const output = document.getElementById('decodeOutput');
+            
+            if (!token) {
+                output.innerHTML = '<span class="error">❌ No token to decode</span>';
+                return;
+            }
+            
+            try {
+                // Decode JWT (without verification)
+                const parts = token.split('.');
+                if (parts.length !== 3) {
+                    output.innerHTML = '<span class="error">❌ Invalid JWT format</span>';
+                    return;
+                }
+                
+                const payload = JSON.parse(atob(parts[1]));
+                const now = Math.floor(Date.now() / 1000);
+                const expired = payload.exp && payload.exp < now;
+                
+                output.innerHTML = '<span class="success">✅ Token decoded</span>\n\n' +
+                    'Payload:\n' + JSON.stringify(payload, null, 2) + '\n\n' +
+                    'Issued: ' + new Date(payload.iat * 1000).toLocaleString() + '\n' +
+                    'Expires: ' + (payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'Never') + '\n' +
+                    'Status: ' + (expired ? '<span class="error">❌ EXPIRED</span>' : '<span class="success">✅ Valid</span>');
+            } catch (e) {
+                output.innerHTML = '<span class="error">❌ Failed to decode: ' + e.message + '</span>';
+            }
+        }
+
+        async function testAPI() {
+            const token = localStorage.getItem('authToken');
+            const output = document.getElementById('apiOutput');
+            
+            if (!token) {
+                output.innerHTML = '<span class="error">❌ No token found</span>';
+                return;
+            }
+            
+            output.innerHTML = '⏳ Testing API call...';
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/admin/stats', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    data = text;
+                }
+                
+                output.innerHTML = 'Status: ' + response.status + ' ' + response.statusText + '\n\n' +
+                    'Response:\n' + JSON.stringify(data, null, 2);
+                    
+            } catch (e) {
+                output.innerHTML = '<span class="error">❌ Error: ' + e.message + '</span>';
+            }
+        }
+        
+        // Auto-run on load
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>

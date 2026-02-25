@@ -38,8 +38,11 @@ const vendorInquirySchema = new mongoose.Schema({
     required: [true, 'Event type is required']
   },
   
+  // Structured eventDate for single or multi-day events
+  // Accepts both legacy Date format and new {start, end} structure
   eventDate: {
-    type: Date
+    type: mongoose.Schema.Types.Mixed,
+    default: undefined
   },
   
   budget: {
@@ -199,6 +202,27 @@ vendorInquirySchema.methods.markAsResponded = function(response) {
   this.vendorResponse = response;
   return this.save();
 };
+
+// Migrate legacy eventDate values (single Date) to structured format on save
+vendorInquirySchema.pre('save', function(next) {
+  try {
+    if (this.eventDate && this.eventDate instanceof Date) {
+      const d = this.eventDate;
+      this.eventDate = { start: d, end: d };
+    } else if (this.eventDate && this.eventDate.start && this.eventDate.end) {
+      // Already structured - nothing to do
+    } else if (this.eventDate && (this.eventDate.start || this.eventDate.end)) {
+      // Normalize possible string values
+      const s = this.eventDate.start ? new Date(this.eventDate.start) : null;
+      const e = this.eventDate.end ? new Date(this.eventDate.end) : (s ? new Date(s) : null);
+      this.eventDate = s ? { start: s, end: e } : undefined;
+    }
+  } catch (err) {
+    // don't block save for migration issues
+    console.warn('Error normalizing eventDate in VendorInquiry.pre.save', err);
+  }
+  next();
+});
 
 const VendorInquiry = mongoose.model('VendorInquiry', vendorInquirySchema);
 

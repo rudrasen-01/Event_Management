@@ -40,6 +40,26 @@ const EventSearch = () => {
   const [showCategoryMenu, setShowCategoryMenu] = useState('');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showAreaDropdown, setShowAreaDropdown] = useState(false);
+  const [budgetLabel, setBudgetLabel] = useState('Budget (Any)');
+  const [customBudget, setCustomBudget] = useState('');
+
+  const presetBudgets = [
+    { label: 'Under ₹50K', value: 50000 },
+    { label: '₹50K - ₹1L', value: 100000 },
+    { label: '₹1L - ₹3L', value: 300000 },
+    { label: '₹3L - ₹5L', value: 500000 },
+    { label: '₹5L+', value: 1000000 }
+  ];
+
+  useEffect(() => {
+    if (filters && filters.budgetMax && filters.budgetMax !== 10000000) {
+      const match = presetBudgets.find(p => p.value === filters.budgetMax);
+      if (match) setBudgetLabel(match.label);
+      else setBudgetLabel(`Up to ₹${Math.round(filters.budgetMax / 1000)}k`);
+    } else {
+      setBudgetLabel('Budget (Any)');
+    }
+  }, [filters.budgetMax]);
 
   // Load dynamic data on mount
   useEffect(() => {
@@ -252,21 +272,38 @@ const EventSearch = () => {
     <section id="event-search" className="relative bg-white">
       {/* Main Search Bar Section */}
       <div className="bg-gradient-to-b from-gray-50 to-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="text-center mb-6">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-              Find Verified Event Services in Your City
+        <div className="max-w-7xl mx-auto px-2 md:px-4 py-4 md:py-8">
+          <div className="text-center mb-4 md:mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-full mb-3">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs md:text-sm font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                India's Premium Event Services Platform
+              </span>
+            </div>
+            <h1 className="text-2xl md:text-4xl lg:text-5xl font-extrabold mb-3">
+              <span className="bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">
+                Discover Exceptional Event
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                Services in Your City
+              </span>
             </h1>
-            <p className="text-gray-600 text-lg">Search by service, location, or budget - Get instant quotes</p>
+            <p className="text-gray-600 text-sm md:text-lg lg:text-xl font-medium max-w-3xl mx-auto">
+              <span className="text-indigo-600 font-semibold">✨ Instant Quotes</span> • 
+              <span className="text-purple-600 font-semibold">100% Verified</span> • 
+              <span className="text-pink-600 font-semibold">Best Prices Guaranteed</span>
+            </p>
           </div>
 
           {/* Main Search Input */}
-          <div className="max-w-5xl mx-auto mb-4">
-            <div className="bg-white rounded-lg border-2 border-gray-300 shadow-lg hover:border-indigo-500 transition-colors">
-              <div className="flex items-stretch">
-                {/* Location Input with Dropdowns */}
-                <div className="relative flex items-center gap-2 px-4 py-3 border-r border-gray-300 min-w-[250px]">
-                  <MapPin className="w-5 h-5 text-gray-400 flex-shrink-0" />
+          <div className="max-w-6xl mx-auto mb-4 px-2">
+            <div className="relative">
+              <div className="bg-white rounded-2xl shadow-md border-2 border-gray-300 hover:border-gray-400 hover:shadow-lg transition-all duration-200">
+                <div className="flex flex-col lg:flex-row items-stretch">
+                  {/* Location Input with Dropdowns */}
+                  <div className="relative flex items-center gap-3 px-4 md:px-5 py-4 bg-gray-50/50 hover:bg-gray-50 border-b lg:border-b-0 lg:border-r-2 border-gray-200 min-w-0 lg:w-64 xl:w-72 transition-colors">
+                    <MapPin className="w-5 h-5 text-gray-600 flex-shrink-0" />
                   
                   {/* City Dropdown */}
                   <div className="relative flex-1">
@@ -280,11 +317,11 @@ const EventSearch = () => {
                       onFocus={() => setShowCityDropdown(true)}
                       onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
                       placeholder="Select City"
-                      className="w-full text-sm focus:outline-none font-medium text-gray-900 bg-transparent"
+                      className="w-full text-sm md:text-base focus:outline-none font-semibold text-gray-900 bg-transparent placeholder-gray-500"
                     />
                     
                     {showCityDropdown && !loadingData && (
-                      <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-300 rounded-lg shadow-xl z-[100] max-h-64 overflow-y-auto">
+                      <div className="absolute top-full left-0 mt-2 w-full md:w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-[100] max-h-64 overflow-y-auto">
                         {cities
                           .filter(city => !selectedCity || city.name.toLowerCase().includes(selectedCity.toLowerCase()))
                           .map((city) => (
@@ -295,13 +332,13 @@ const EventSearch = () => {
                                 e.preventDefault();
                                 handleCitySelect(city);
                               }}
-                              className="w-full px-4 py-2.5 text-left hover:bg-indigo-50 flex items-center justify-between border-b border-gray-100 last:border-b-0"
+                              className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between border-b border-gray-50 last:border-b-0 transition-colors"
                             >
                               <div>
                                 <div className="text-sm font-medium text-gray-900">{city.name}</div>
                                 <div className="text-xs text-gray-500">
                                   {city.state}
-                                  {city.count > 0 && <span className="ml-1 text-indigo-600 font-medium">• {city.count} vendors</span>}
+                                  {city.count > 0 && <span className="ml-1 text-gray-700 font-medium">• {city.count} vendors</span>}
                                 </div>
                               </div>
                             </button>
@@ -316,7 +353,7 @@ const EventSearch = () => {
                   {/* Area Dropdown - Only show if city is selected */}
                   {selectedCity && (
                     <>
-                      <span className="text-gray-400">|</span>
+                      <span className="text-gray-400 font-light">|</span>
                       <div className="relative flex-1">
                         <input
                           type="text"
@@ -328,11 +365,11 @@ const EventSearch = () => {
                           onFocus={() => setShowAreaDropdown(true)}
                           onBlur={() => setTimeout(() => setShowAreaDropdown(false), 200)}
                           placeholder="Select Area"
-                          className="w-full text-sm focus:outline-none font-medium text-gray-900 bg-transparent"
+                          className="w-full text-sm md:text-base focus:outline-none font-semibold text-gray-900 bg-transparent placeholder-gray-500"
                         />
                         
                         {showAreaDropdown && availableAreas.length > 0 && (
-                          <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-300 rounded-lg shadow-xl z-[100] max-h-64 overflow-y-auto">
+                          <div className="absolute top-full left-0 mt-2 w-full md:w-64 bg-white border-2 border-gray-300 rounded-xl shadow-xl z-[100] max-h-64 overflow-y-auto">
                             {availableAreas
                               .filter(area => !selectedArea || area.toLowerCase().includes(selectedArea.toLowerCase()))
                               .map((area) => (
@@ -343,7 +380,7 @@ const EventSearch = () => {
                                     e.preventDefault();
                                     handleAreaSelect(area);
                                   }}
-                                  className="w-full px-4 py-2.5 text-left hover:bg-indigo-50 text-sm text-gray-900 border-b border-gray-100 last:border-b-0"
+                                  className="w-full px-4 py-3 text-left hover:bg-gray-100 active:bg-gray-200 text-sm font-semibold text-gray-900 border-b border-gray-100 last:border-b-0 transition-colors"
                                 >
                                   {area}
                                 </button>
@@ -356,16 +393,16 @@ const EventSearch = () => {
                   
                   <button 
                     onClick={handleLocate} 
-                    className="text-indigo-600 hover:text-indigo-700 transition-colors"
+                    className="text-gray-600 hover:text-gray-900 transition-colors p-1 hover:bg-gray-100 rounded"
                     title="Use my location"
                   >
-                    <Crosshair className={`w-4 h-4 ${isLocating ? 'animate-spin' : ''}`} />
+                    <Crosshair className={`w-5 h-5 ${isLocating ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
 
                 {/* Search Input with Smart Autocomplete */}
-                <div className="flex-1 relative">
-                  <div className="absolute inset-0">
+                <div className="flex-1 relative border-t lg:border-t-0 lg:border-l-2 border-gray-200 hover:bg-gray-50/30 transition-colors">
+                  <div className="absolute inset-0 flex items-center">
                     <SearchAutocomplete
                       onSelect={(suggestion) => {
                         setSearchQuery(suggestion.label);
@@ -377,22 +414,50 @@ const EventSearch = () => {
                       onInputChange={(value) => {
                         setSearchQuery(value);
                       }}
-                      placeholder="Search for Venues, Photographers, Singers, DJs, Anchors..."
+                      placeholder="Search for Venues, Photographers, Singers, DJs..."
                       showIcon={false}
+                      hideHelperText={true}
                     />
                   </div>
                 </div>
 
-                {/* Search Button */}
-                <button
-                  onClick={handleContinue}
-                  className="px-8 py-3 bg-orange-500 text-white font-semibold hover:bg-orange-600 rounded-r-lg flex items-center gap-2 transition-colors"
-                >
-                  <Search className="w-5 h-5" />
-                  Search
-                </button>
+                {/* Budget Input and Search Button */}
+                <div className="flex items-stretch lg:w-auto border-t lg:border-t-0 lg:border-l-2 border-gray-200">
+                  {/* Manual Budget Input */}
+                  <div className="relative flex items-center px-4 md:px-5 py-4 lg:w-52 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                    <input
+                      type="number"
+                      value={customBudget}
+                      onChange={(e) => setCustomBudget(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const v = parseInt(customBudget) || 10000000;
+                          updateFilter('budgetMax', v);
+                          setBudgetLabel(v === 10000000 ? 'Budget (Any)' : `Up to ₹${Math.round(v / 1000)}k`);
+                        }
+                      }}
+                      onBlur={() => {
+                        const v = parseInt(customBudget) || 10000000;
+                        updateFilter('budgetMax', v);
+                        setBudgetLabel(v === 10000000 ? 'Budget (Any)' : `Up to ₹${Math.round(v / 1000)}k`);
+                      }}
+                      placeholder="Budget (₹)"
+                      className="w-full text-sm md:text-base focus:outline-none font-semibold text-gray-900 bg-transparent placeholder-gray-500"
+                    />
+                  </div>
+
+                  {/* Search Button */}
+                  <button
+                    onClick={handleContinue}
+                    className="px-8 md:px-10 lg:px-12 py-4 bg-gray-900 text-white font-bold text-base hover:bg-gray-800 active:bg-black flex items-center justify-center gap-2.5 transition-all duration-200 rounded-r-2xl shadow-sm hover:shadow-md"
+                  >
+                    <Search className="w-5 h-5" />
+                    <span>Search</span>
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
             {locationStatus && (
               <p className="text-xs text-gray-600 mt-2 px-1">{locationStatus}</p>
             )}
@@ -452,160 +517,106 @@ const EventSearch = () => {
               </div>
             ))}
           </div>
-        </div>
-      </div>
 
-      {/* Sub-Navigation Filter Bar */}
-      <div className="bg-gray-50 border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            {/* Left Filters */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <select
-                value={filters.eventCategory}
-                onChange={(e) => updateFilter('eventCategory', e.target.value)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:border-indigo-500 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Event Type</option>
-                {eventCategories.map((cat, idx) => (
-                  <option key={idx} value={cat.value}>{cat.label}</option>
-                ))}
-              </select>
-              
-              <div className="relative">
-                <input
-                  type="number"
-                  value={filters.budgetMax === 10000000 ? '' : filters.budgetMax}
-                  onChange={(e) => updateFilter('budgetMax', parseInt(e.target.value) || 10000000)}
-                  placeholder="Budget"
-                  className="w-32 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:border-indigo-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <select
-                value={filters.radius}
-                onChange={(e) => updateFilter('radius', parseInt(e.target.value))}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:border-indigo-500 focus:outline-none focus:border-indigo-500"
-              >
-                <option value="2">Within 2km</option>
-                <option value="5">Within 5km</option>
-                <option value="10">Within 10km</option>
-                <option value="20">Within 20km</option>
-                <option value="50">Within 50km</option>
-                <option value="city">Entire City</option>
-              </select>
-
-              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:border-indigo-500">
-                <Star className="w-4 h-4 text-yellow-500" />
-                Rating
-                <ChevronDown className="w-4 h-4" />
-              </button>
-
-              <label className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:border-indigo-500 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.verified}
-                  onChange={(e) => updateFilter('verified', e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <Shield className="w-4 h-4 text-green-600" />
-                Verified Only
-              </label>
+          {/* Suggested Budget Ranges (below search) */}
+          <div className="max-w-6xl mx-auto mt-6 px-4">
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              <span className="text-sm md:text-base font-bold text-gray-800 flex items-center gap-2">
+                Popular Budgets:
+              </span>
+              {presetBudgets.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => {
+                    updateFilter('budgetMax', p.value);
+                    setBudgetLabel(p.label);
+                    setCustomBudget(p.value.toString());
+                  }}
+                  className={`px-5 py-2.5 rounded-full text-sm font-semibold border-2 transition-all duration-200 whitespace-nowrap shadow-sm hover:shadow-md ${
+                    filters.budgetMax === p.value
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-800 border-gray-300 hover:border-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-
-            {/* Right Actions */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600">Sort:</span>
-              <select className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:border-indigo-500">
-                <option>Relevance</option>
-                <option>Price: Low to High</option>
-                <option>Price: High to Low</option>
-                <option>Rating</option>
-                <option>Distance</option>
-              </select>
-              
-              <button className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700">
-                All Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Budget Chips */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold text-gray-700">Popular Budgets:</span>
-            {[
-              { label: 'Under ₹50K', value: 50000 },
-              { label: '₹50K - ₹1L', value: 100000 },
-              { label: '₹1L - ₹3L', value: 300000 },
-              { label: '₹3L - ₹5L', value: 500000 },
-              { label: '₹5L+', value: 500001 }
-            ].map((chip, idx) => (
-              <button
-                key={idx}
-                onClick={() => updateFilter('budgetMax', chip.value)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
-                  filters.budgetMax === chip.value
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-300 hover:text-indigo-600'
-                }`}
-              >
-                {chip.label}
-              </button>
-            ))}
           </div>
         </div>
       </div>
 
       {/* Trust Indicators */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Shield className="w-6 h-6 text-indigo-600" />
-                <div className="text-3xl font-bold text-indigo-600">500+</div>
+      <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border-b border-indigo-100">
+        <div className="max-w-7xl mx-auto px-2 md:px-4 py-8 md:py-10">
+          <div className="text-center mb-6">
+            <h2 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Why Thousands Trust Us
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center">
+            <div className="transform hover:scale-105 transition-transform duration-300">
+              <div className="bg-white rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-shadow">
+                <div className="flex flex-col items-center justify-center gap-2 mb-2">
+                  <div className="p-3 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full">
+                    <Shield className="w-6 h-6 md:w-8 md:h-8 text-indigo-600" />
+                  </div>
+                  <div className="text-2xl md:text-4xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">500+</div>
+                </div>
+                <div className="text-xs md:text-sm text-gray-700 font-bold">Verified Vendors</div>
+                <div className="text-xs text-gray-500 mt-1">Trusted Professionals</div>
               </div>
-              <div className="text-sm text-gray-600 font-medium">Verified Vendors</div>
             </div>
-            <div>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Award className="w-6 h-6 text-indigo-600" />
-                <div className="text-3xl font-bold text-indigo-600">1000+</div>
+            <div className="transform hover:scale-105 transition-transform duration-300">
+              <div className="bg-white rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-shadow">
+                <div className="flex flex-col items-center justify-center gap-2 mb-2">
+                  <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full">
+                    <Award className="w-6 h-6 md:w-8 md:h-8 text-purple-600" />
+                  </div>
+                  <div className="text-2xl md:text-4xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">1000+</div>
+                </div>
+                <div className="text-xs md:text-sm text-gray-700 font-bold">Events Delivered</div>
+                <div className="text-xs text-gray-500 mt-1">Memorable Moments</div>
               </div>
-              <div className="text-sm text-gray-600 font-medium">Events Completed</div>
             </div>
-            <div>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Star className="w-6 h-6 text-yellow-500 fill-yellow-500" />
-                <div className="text-3xl font-bold text-indigo-600">4.8</div>
+            <div className="transform hover:scale-105 transition-transform duration-300">
+              <div className="bg-white rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-shadow">
+                <div className="flex flex-col items-center justify-center gap-2 mb-2">
+                  <div className="p-3 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-full">
+                    <Star className="w-6 h-6 md:w-8 md:h-8 text-yellow-600 fill-yellow-500" />
+                  </div>
+                  <div className="text-2xl md:text-4xl font-extrabold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">4.8</div>
+                </div>
+                <div className="text-xs md:text-sm text-gray-700 font-bold">Average Rating</div>
+                <div className="text-xs text-gray-500 mt-1">Customer Satisfaction</div>
               </div>
-              <div className="text-sm text-gray-600 font-medium">Average Rating</div>
             </div>
-            <div>
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <TrendingUp className="w-6 h-6 text-indigo-600" />
-                <div className="text-3xl font-bold text-indigo-600">₹1Cr+</div>
+            <div className="transform hover:scale-105 transition-transform duration-300">
+              <div className="bg-white rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-shadow">
+                <div className="flex flex-col items-center justify-center gap-2 mb-2">
+                  <div className="p-3 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full">
+                    <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
+                  </div>
+                  <div className="text-2xl md:text-4xl font-extrabold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">₹1Cr+</div>
+                </div>
+                <div className="text-xs md:text-sm text-gray-700 font-bold">Business Generated</div>
+                <div className="text-xs text-gray-500 mt-1">Growth Partner</div>
               </div>
-              <div className="text-sm text-gray-600 font-medium">Business Generated</div>
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
+          <div className="mt-6 md:mt-8 flex flex-wrap justify-center gap-4 md:gap-6">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow">
               <Shield className="w-4 h-4 text-green-600" />
-              <span>100% Verified Vendors</span>
+              <span className="text-xs md:text-sm font-semibold text-gray-700">100% Verified Vendors</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow">
               <Sparkles className="w-4 h-4 text-yellow-600" />
-              <span>Best Price Guarantee</span>
+              <span className="text-xs md:text-sm font-semibold text-gray-700">Best Price Guarantee</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow">
               <Award className="w-4 h-4 text-indigo-600" />
-              <span>Quality Assured</span>
+              <span className="text-xs md:text-sm font-semibold text-gray-700">Premium Quality Assured</span>
             </div>
           </div>
         </div>

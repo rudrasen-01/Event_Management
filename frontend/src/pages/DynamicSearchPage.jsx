@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, MapPin, Sparkles, TrendingUp, Package, List } from 'lucide-react';
+import { Search, MapPin } from 'lucide-react';
 import { ServiceProvider, useService } from '../contexts/ServiceContext';
 import DynamicFilterPanel from '../components/DynamicFilterPanel';
 import LocationFilters from '../components/LocationFilters';
@@ -41,6 +41,8 @@ const DynamicSearchPageContent = () => {
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('solutions'); // solutions | vendors
   const [sortBy, setSortBy] = useState('relevance');
+  const [tierBreakdown, setTierBreakdown] = useState(null);
+  const [searchMetadata, setSearchMetadata] = useState(null);
 
   // Detect service when query changes
   useEffect(() => {
@@ -80,6 +82,8 @@ const DynamicSearchPageContent = () => {
       // Use only database-driven results - no mock data fallback
       const vendorsList = response.vendors || [];
       setResults(vendorsList);
+      setTierBreakdown(response.tierBreakdown || null);
+      setSearchMetadata(response.metadata || null);
     } catch (error) {
       console.error('❌ Search error:', error);
       // Show empty state on error - no mock data
@@ -108,66 +112,195 @@ const DynamicSearchPageContent = () => {
     executeSearch();
   };
 
+  // Group vendors by tier - Strict Priority Order
+  const groupVendorsByTier = () => {
+    // If no results, return empty array
+    if (!results || results.length === 0) {
+      return [];
+    }
+
+    const groups = {
+      exact_area: { 
+        vendors: [], 
+        title: 'Same Area Vendors', 
+        subtitle: 'In Your Area',
+        icon: '👑', 
+        color: 'indigo', 
+        description: `Located exactly in ${filterValues.area || 'your selected area'} and highly rated`,
+        priority: 1
+      },
+      nearby: { 
+        vendors: [], 
+        title: 'Nearby Vendors', 
+        subtitle: 'Nearby',
+        icon: '🔵', 
+        color: 'blue', 
+        description: `Vendors near ${filterValues.area || filterValues.city || 'your location'}`,
+        priority: 2
+      },
+      same_city: { 
+        vendors: [], 
+        title: 'Same City – Other Areas', 
+        subtitle: filterValues.city || 'Same City',
+        icon: '🔵', 
+        color: 'purple', 
+        description: `Other vendors in ${filterValues.city || 'the same city'}`,
+        priority: 3
+      },
+      adjacent_city: { 
+        vendors: [], 
+        title: 'Nearby Cities Vendors', 
+        subtitle: 'Nearby Cities',
+        icon: '🔵', 
+        color: 'green', 
+        description: 'Vendors from nearby cities within practical distance',
+        priority: 4
+      },
+      all: {
+        vendors: [],
+        title: 'All Vendors',
+        subtitle: 'Available Vendors',
+        icon: '🔵',
+        color: 'indigo',
+        description: 'Browse all available vendors for your event',
+        priority: 5
+      }
+    };
+
+    results.forEach(vendor => {
+      const tier = vendor.matchTier || 'all'; // Default to 'all' if no tier
+      if (groups[tier]) {
+        groups[tier].vendors.push(vendor);
+      } else {
+        // Fallback to 'all' group if tier doesn't exist
+        groups.all.vendors.push(vendor);
+      }
+    });
+
+    // Filter out empty groups and return in strict priority order
+    return Object.entries(groups)
+      .filter(([_, group]) => group.vendors.length > 0)
+      .sort((a, b) => a[1].priority - b[1].priority)
+      .map(([tier, group]) => ({ tier, ...group }));
+  };
+
+  // Section Header Component - Exact Reference Image Style
+  const SectionHeader = ({ title, subtitle, icon, color, description, count, priority }) => {
+    // Emoji icons for each priority level
+    const emojiIcons = {
+      1: '👑',  // Crown for top vendors
+      2: '🔵',  // Blue circle for nearby
+      3: '🔵',  // Blue circle for more in city
+      4: '🔵'   // Blue circle for nearby cities
+    };
+
+    const displayIcon = icon || emojiIcons[priority] || '🔵';
+
+    // Distance filter options for "More Vendors" and "Nearby Cities" sections
+    const showDistanceFilters = priority === 3 || priority === 4;
+    const distanceOptions = ['5 km', '10 km', '25 km', '50 km'];
+
+    return (
+      <div className="mb-6">
+        {/* Main Header Row */}
+        <div className="flex items-center justify-between gap-4 mb-3">
+          {/* Left: Icon + Title + Badge */}
+          <div className="flex items-center gap-3">
+            {/* Circular Icon Background */}
+            <div className={`
+              w-10 h-10 rounded-full flex items-center justify-center text-xl
+              ${priority === 1 ? 'bg-purple-100' : 'bg-blue-100'}
+            `}>
+              {displayIcon}
+            </div>
+            
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+                
+                {/* Top Rated Badge */}
+                {priority === 1 && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
+                    <span>⚡</span>
+                    <span>Top Rated</span>
+                  </span>
+                )}
+              </div>
+              
+              {/* Subtitle/Description */}
+              <p className="text-sm text-gray-600 mt-0.5">
+                {description}
+              </p>
+            </div>
+          </div>
+
+          {/* Right: Distance Filter Buttons */}
+          {showDistanceFilters && (
+            <div className="flex items-center gap-2">
+              {distanceOptions.map((distance) => (
+                <button
+                  key={distance}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                >
+                  {distance}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Search Bar - Sticky */}
       <div className="sticky top-16 md:top-20 z-30 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <form onSubmit={handleSearch} className="relative">
-            <div className="flex items-center gap-3">
-              {/* Search Input */}
-              <div className="flex-1 relative">
-                <div className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-gray-300 rounded-lg focus-within:border-indigo-500 transition-colors">
-                  <Search className="w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search for Photographer, Tent, Pandit, Caterer..."
-                    className="flex-1 text-sm focus:outline-none"
-                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                  />
-                  {searchContext.category && filterSchema && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
-                      <span>{filterSchema.detectedService?.icon || '🔍'}</span>
-                      <span>{filterSchema.detectedService?.name || searchContext.category}</span>
-                    </div>
-                  )}
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="relative">
+            {/* Search Input */}
+            <div className="flex items-center gap-3 px-4 h-12 bg-white border-2 border-gray-300 rounded-lg shadow-md hover:border-gray-400 hover:shadow-lg focus-within:border-gray-500 focus-within:shadow-lg transition-all">
+              <Search className="w-5 h-5 text-gray-600 flex-shrink-0" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="What service do you need? (e.g., Photographer, Caterer, Venue)"
+                className="flex-1 text-sm font-semibold placeholder-gray-400 focus:outline-none"
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              />
+              {searchContext.category && filterSchema && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold flex-shrink-0">
+                  <span>{filterSchema.detectedService?.icon || '🔍'}</span>
+                  <span>{filterSchema.detectedService?.name || searchContext.category}</span>
                 </div>
-
-                {/* Service Suggestions Dropdown */}
-                {showSuggestions && suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-                    <div className="p-2">
-                      <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2">
-                        Detected Services
-                      </div>
-                      {suggestions.map(service => (
-                        <button
-                          key={service.serviceId}
-                          onClick={() => handleSuggestionClick(service.serviceId)}
-                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-indigo-50 rounded text-left"
-                        >
-                          <span className="text-2xl">{service.icon}</span>
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{service.serviceName}</div>
-                            <div className="text-xs text-gray-500">Click to load filters</div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Search
-              </button>
+              )}
             </div>
-          </form>
+
+            {/* Service Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-gray-300 rounded-lg shadow-xl z-50">
+                <div className="p-2">
+                  <div className="text-xs font-semibold text-gray-500 uppercase px-3 py-2">
+                    Detected Services
+                  </div>
+                  {suggestions.map(service => (
+                    <button
+                      key={service.serviceId}
+                      onClick={() => handleSuggestionClick(service.serviceId)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-100 active:bg-gray-200 rounded text-left transition-colors"
+                    >
+                      <span className="text-2xl">{service.icon}</span>
+                      <div className="flex-1">
+                        <div className="font-semibold text-gray-900">{service.serviceName}</div>
+                        <div className="text-xs text-gray-500">Click to load filters</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Active Service Indicator */}
           {activeService && serviceConfig && (
@@ -314,9 +447,36 @@ const DynamicSearchPageContent = () => {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {results.map((vendor, idx) => (
-                  <VendorCard key={vendor._id || idx} vendor={vendor} />
+              /* Tier-based Results Display - Reference Image Style */
+              <div className="space-y-10">
+                {groupVendorsByTier().map((group, index) => (
+                  <div 
+                    key={group.tier}
+                    className={`
+                      ${index > 0 ? 'pt-6' : ''}
+                    `}
+                  >
+                    <SectionHeader 
+                      title={group.title}
+                      subtitle={group.subtitle}
+                      icon={group.icon}
+                      color={group.color}
+                      description={group.description}
+                      count={group.vendors.length}
+                      priority={group.priority}
+                    />
+                    
+                    {/* Vendor Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                      {group.vendors.map((vendor, idx) => (
+                        <VendorCard 
+                          key={vendor._id || idx} 
+                          vendor={vendor}
+                          sectionLabel={group.subtitle}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

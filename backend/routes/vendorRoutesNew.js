@@ -9,7 +9,8 @@ const {
   deleteVendor,
   getAllVendors,
   approveVendor,
-  rejectVendor
+  rejectVendor,
+  submitReview
 } = require('../controllers/vendorControllerNew');
 const { googleLoginVendor } = require('../controllers/googleAuthController');
 const inquiryController = require('../controllers/inquiryController');
@@ -82,7 +83,12 @@ router.post('/google-login', googleLoginVendor);
 // @access  Public
 router.get('/:vendorId', getVendor);
 
-// @route   POST /api/vendors/:vendorId/review
+// @route   POST /api/vendors/:vendorId/reviews
+// @desc    Submit review for vendor (pending approval)
+// @access  Private (User)
+router.post('/:vendorId/reviews', protect, submitReview);
+
+// @route   POST /api/vendors/:vendorId/review (Legacy - kept for backward compatibility)
 // @desc    Add review to vendor
 // @access  Public (should be authenticated)
 router.post('/:vendorId/review', addReview);

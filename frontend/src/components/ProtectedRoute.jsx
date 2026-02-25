@@ -15,8 +15,17 @@ import Loader from './Loader';
 const ProtectedRoute = ({ children, allowedRoles = [], redirectTo = '/' }) => {
   const { user, isAuthenticated, loading } = useAuth();
 
+  console.log('🛡️ ProtectedRoute check:', {
+    loading,
+    authenticated: isAuthenticated(),
+    user: user?.email,
+    role: user?.role,
+    allowedRoles
+  });
+
   // Show loader while checking authentication
   if (loading) {
+    console.log('⏳ Auth loading...');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader />
@@ -26,11 +35,13 @@ const ProtectedRoute = ({ children, allowedRoles = [], redirectTo = '/' }) => {
 
   // Check if user is authenticated
   if (!isAuthenticated()) {
+    console.log('❌ Not authenticated, redirecting to:', redirectTo);
     return <Navigate to={redirectTo} replace />;
   }
 
   // Check role-based access if roles are specified
   if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
+    console.log('❌ Role not allowed. User role:', user?.role, 'Allowed:', allowedRoles);
     // Redirect based on user role
     if (user?.role === 'admin') {
       return <Navigate to="/admin" replace />;
@@ -39,6 +50,7 @@ const ProtectedRoute = ({ children, allowedRoles = [], redirectTo = '/' }) => {
     }
   }
 
+  console.log('✅ Access granted!');
   // User is authenticated and authorized
   return children;
 };

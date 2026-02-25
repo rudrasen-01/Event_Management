@@ -34,11 +34,15 @@ const InquiryModal = ({
     userContact: '',
     eventType: prefilledEventType || '',
     budget: '',
-    message: '' // Always string, never undefined
+    message: '', // Always string, never undefined
+    // New date fields (ISO date strings yyyy-mm-dd)
+    eventStart: '',
+    eventEnd: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null); // { type: 'success' | 'error', message: '' }
+  const [isMultiDay, setIsMultiDay] = useState(false);
   const [errors, setErrors] = useState({});
   const defaultEventTypes = [
     { value: 'wedding', label: 'Wedding' },
@@ -51,6 +55,9 @@ const InquiryModal = ({
 
   const [eventTypes, setEventTypes] = useState(defaultEventTypes);
   const [loadingEventTypes, setLoadingEventTypes] = useState(false);
+
+  // Today's date string in yyyy-mm-dd for date input min attribute
+  const todayStr = new Date().toISOString().slice(0,10);
 
   // Refs for accessibility
   const modalRef = useRef(null);
@@ -119,14 +126,23 @@ const InquiryModal = ({
         preEventType = searchFilters.eventCategory;
       }
 
+      // Determine prefilled dates from search filters (support multiple possible keys)
+      const preStart = (searchFilters?.dateStart || searchFilters?.startDate || (searchFilters?.eventDate && searchFilters.eventDate.start)) || '';
+      const preEnd = (searchFilters?.dateEnd || searchFilters?.endDate || (searchFilters?.eventDate && searchFilters.eventDate.end)) || '';
+
       setFormData({
         userName: (isAuthenticated() && user?.name) ? user.name : '',
         userEmail: (isAuthenticated() && user?.email) ? user.email : '',
         userContact: (isAuthenticated() && user?.phone) ? user.phone : '',
         eventType: preEventType || '',
         budget: preBudget,
-        message: '' // Explicit empty string prevents undefined
+        message: '', // Explicit empty string prevents undefined
+        eventStart: preStart ? String(preStart).slice(0,10) : '',
+        eventEnd: preEnd ? String(preEnd).slice(0,10) : ''
       });
+
+      // If an end date was provided and differs from start, enable multi-day UI
+      setIsMultiDay(Boolean(preEnd && preStart && String(preEnd).slice(0,10) !== String(preStart).slice(0,10)));
       setErrors({});
       setNotification(null);
       
@@ -222,6 +238,26 @@ const InquiryModal = ({
         newErrors.eventType = 'Event type is required';
       }
 
+      // Date validation
+      const start = formData.eventStart ? new Date(formData.eventStart) : null;
+      const end = formData.eventEnd ? new Date(formData.eventEnd) : null;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      if (!start || isNaN(start.getTime())) {
+        newErrors.eventStart = 'Start date is required';
+      } else if (start < today) {
+        newErrors.eventStart = 'Start date cannot be in the past';
+      }
+
+      if (formData.eventEnd) {
+        if (!end || isNaN(end.getTime())) {
+          newErrors.eventEnd = 'Invalid end date';
+        } else if (end < start) {
+          newErrors.eventEnd = 'End date cannot be before start date';
+        }
+      }
+
       // Budget check - simple
       if (vendor && vendor._id) {
         if (!formData.budget || formData.budget === '') {
@@ -285,6 +321,15 @@ const InquiryModal = ({
         userContact: String(formData.userContact || '').trim(),
         eventType: String(formData.eventType || ''),
         budget: formData.budget ? parseInt(formData.budget) : 0,
+        // Structured eventDate: always send { start, end } (ISO strings). If end missing, set equal to start
+        eventDate: (() => {
+          const s = formData.eventStart ? new Date(formData.eventStart) : null;
+          const e = formData.eventEnd ? new Date(formData.eventEnd) : null;
+          if (!s) return undefined;
+          const sISO = s.toISOString();
+          const eISO = (e && !isNaN(e.getTime())) ? e.toISOString() : sISO;
+          return { start: sISO, end: eISO };
+        })(),
         message: formData.message ? String(formData.message).trim() : undefined,
         vendorId: vendor?._id,
         location: userLocation ? {
@@ -609,6 +654,66 @@ const InquiryModal = ({
                 <p className="mt-1 text-xs text-gray-500 text-right">
                   {String(formData.message).length}/300
                 </p>
+              )}
+            </div>
+
+            {/* Event Date Selection */}
+            <div>
+              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
+                <Calendar className="w-4 h-4 text-indigo-600" />
+                Event Date
+              </label>
+
+              {/* Start Date (required) */}
+              <input
+                type="date"
+                id="eventStart"
+                name="eventStart"
+                value={formData.eventStart}
+                onChange={(e) => {
+                  handleChange(e);
+                  // if end date is before new start, clear end date
+                  if (formData.eventEnd && new Date(formData.eventEnd) < new Date(e.target.value)) {
+                    setFormData(prev => ({ ...prev, eventEnd: '' }));
+                    setIsMultiDay(false);
+                  }
+                }}
+                min={todayStr}
+                className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${errors.eventStart ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                required
+              />
+              {errors.eventStart && (
+                <p className="mt-1 text-xs text-red-600">{errors.eventStart}</p>
+              )}
+
+              {/* Multi-day toggle */}
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="checkbox"
+                  id="isMultiDay"
+                  checked={isMultiDay}
+                  onChange={(e) => setIsMultiDay(Boolean(e.target.checked))}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="isMultiDay" className="text-sm text-gray-600">This is a multi-day event</label>
+              </div>
+
+              {/* End Date (optional) - shown only when multi-day */}
+              {isMultiDay && (
+                <div className="mt-2">
+                  <input
+                    type="date"
+                    id="eventEnd"
+                    name="eventEnd"
+                    value={formData.eventEnd}
+                    onChange={handleChange}
+                    min={formData.eventStart || todayStr}
+                    className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${errors.eventEnd ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+                  />
+                  {errors.eventEnd && (
+                    <p className="mt-1 text-xs text-red-600">{errors.eventEnd}</p>
+                  )}
+                </div>
               )}
             </div>
 

@@ -20,78 +20,83 @@ const FAQ = () => {
 
   const faqs = [
     {
-      category: 'General',
+      category: 'General FAQs',
       questions: [
         {
           question: 'What is AIS Signature Event?',
-          answer: 'AIS Signature Event is a managed event discovery platform that connects customers with verified event vendors. Unlike traditional listing sites, we manage the entire process from vendor selection to coordination, ensuring a hassle-free experience.'
+          answer: 'AIS Signature Event is a tech-enabled event ecosystem that combines smart vendor discovery with managed execution. The platform empowers customers to find and finalize event services based on location, budget, and preferences, while AIS ensures verified vendors, transparent pricing, financial enablement, and single-point accountability throughout the event lifecycle.'
         },
         {
-          question: 'How is this different from other event platforms?',
-          answer: 'We are not a classifieds or directory platform. We operate as a managed service where our experts handle vendor coordination, your contact details remain private, and vendors are personally verified for quality and reliability.'
+          question: 'What does "Verified Vendor" mean?',
+          answer: 'Every vendor on our platform undergoes a strict vetting process, including background checks, service quality audits, and past performance reviews to ensure your event is in safe hands.'
         },
         {
-          question: 'Which cities do you serve?',
-          answer: 'Currently, we serve Indore, Madhya Pradesh. We are expanding to other major cities including Bhopal, Mumbai, Delhi, Bangalore, and Pune. Check our homepage for the latest city availability.'
+          question: 'Is AIS available in all cities?',
+          answer: 'Currently, AIS is expanding phase-wise across selected cities. More locations will be added soon.'
         }
       ]
     },
     {
-      category: 'For Customers',
+      category: 'Booking & Process',
       questions: [
         {
-          question: 'How do I find vendors for my event?',
-          answer: 'Use our guided search tool on the homepage. Select your event type, sub-category, budget range, and location. Our system will show you verified vendors that match your criteria. You can then submit an inquiry through our platform.'
+          question: 'How do I book an event through the platform?',
+          answer: 'Simply enter your location, budget, and event preferences. Our smart discovery tool will suggest the best-matched vendors. Once you choose, our team helps you finalize the booking and manages the execution.'
         },
         {
-          question: 'Is the service free for customers?',
-          answer: 'Yes, our service is completely free for customers. You pay only the vendors directly for their services. We charge vendors a small commission to maintain and improve our platform.'
+          question: 'Can I customize my requirements?',
+          answer: 'Absolutely! You can filter services based on your specific needs, or speak to our event consultants for a completely tailored package.'
         },
         {
-          question: 'Will vendors get my phone number?',
-          answer: 'No, your contact details remain private. All communication happens through our managed inquiry system. This eliminates spam calls and ensures professional, coordinated communication.'
-        },
-        {
-          question: 'How do I track my inquiry status?',
-          answer: 'Log into your dashboard to view all your inquiries, their current status, and any vendor responses. You will also receive email notifications for important updates.'
+          question: 'Do I have to talk to 10 different vendors?',
+          answer: 'No. AIS acts as your single point of contact. We handle all vendor communications so you can focus on enjoying your event.'
         }
       ]
     },
     {
-      category: 'For Vendors',
+      category: 'Payments & Financials',
+      questions: [
+        {
+          question: 'Is the pricing transparent?',
+          answer: 'Yes. We believe in "Transparent Pricing." The quote you see is what you pay—no hidden costs or last-minute surprises.'
+        }
+      ]
+    },
+    {
+      category: 'Customer FAQs',
+      questions: [
+        {
+          question: 'How do I find vendors on AIS?',
+          answer: 'Simply select your city, event type, and budget range to view verified vendor options.'
+        },
+        {
+          question: 'Are vendors verified?',
+          answer: 'Yes, vendors undergo a verification and profile screening process before being listed.'
+        },
+        {
+          question: 'Can I contact vendors directly?',
+          answer: 'AIS manages the coordination process to ensure quality control and smooth communication.'
+        },
+        {
+          question: 'What types of events are covered?',
+          answer: 'Weddings, birthdays, anniversaries, corporate events, exhibitions, private parties, and more.'
+        }
+      ]
+    },
+    {
+      category: 'Vendor FAQs',
       questions: [
         {
           question: 'How do I register as a vendor?',
           answer: 'Click "Become a Partner" on our homepage and complete the 4-step registration process. Provide your business details, services, location, and required documents. Our team will review and approve your application within 24-48 hours.'
         },
         {
-          question: 'What are the requirements to become a vendor?',
-          answer: 'You need a legitimate business, relevant experience in event services, proper documentation (business license, GST if applicable), and the ability to serve customers professionally in your declared service areas.'
+          question: 'Is there a listing fee?',
+          answer: 'AIS offers multiple listing plans including basic and featured options. Pricing details are available in the Vendor Plans section.'
         },
         {
           question: 'How do I receive customer inquiries?',
           answer: 'Once approved, you will receive inquiries through your vendor dashboard. Our admin team may assign inquiries to you based on customer requirements and your service offerings. You can respond directly through the platform.'
-        },
-        {
-          question: 'What commission do you charge?',
-          answer: 'We charge a small commission only when you successfully complete a project through our platform. Commission rates vary by service category and are clearly communicated during registration. No upfront fees or monthly charges.'
-        }
-      ]
-    },
-    {
-      category: 'Booking & Payments',
-      questions: [
-        {
-          question: 'How do payments work?',
-          answer: 'Currently, payments are handled directly between customers and vendors. We provide a communication platform but do not process payments. Integrated payment features will be available in future updates.'
-        },
-        {
-          question: 'Can I cancel or modify my inquiry?',
-          answer: 'Yes, you can modify or cancel inquiries from your dashboard before vendors respond. Once a vendor responds, contact our support team to help coordinate any changes with the vendor.'
-        },
-        {
-          question: 'What if I am not satisfied with a vendor?',
-          answer: 'Contact our support team immediately. We take vendor quality seriously and will help resolve issues. Vendors not meeting our standards may be removed from the platform.'
         }
       ]
     }
@@ -195,7 +200,7 @@ const FAQ = () => {
             <Button size="lg" onClick={() => navigate('/contact-us')}>
               Contact Support
             </Button>
-            <Button variant="outline" size="lg" onClick={() => window.location.href = 'mailto:support@aissignatureevent.com'}>
+            <Button variant="outline" size="lg" onClick={() => window.location.href = 'mailto:info@aissignatureevent.com'}>
               Email Us
             </Button>
           </div>

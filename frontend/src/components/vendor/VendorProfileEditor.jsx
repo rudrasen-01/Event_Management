@@ -4,27 +4,40 @@
  * All fields that show in search results are editable here
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera, MapPin, Phone, Mail, Globe, Instagram, Facebook,
   Edit2, Save, X, Loader2, CheckCircle, AlertCircle,
   Building2, Award, DollarSign, Calendar, Star, Users,
   Package, Image as ImageIcon, Video, FileText, ChevronRight,
-  MessageCircle, Lock
+  MessageCircle, Lock, Upload
 } from 'lucide-react';
 import { getApiUrl } from '../../config/api';
+import { uploadVendorImage, updateVendorProfile, getVendorMedia, addVendorMedia, deleteVendorMedia } from '../../services/vendorService';
 
 const API_BASE_URL = getApiUrl();
 
 const VendorProfileEditor = () => {
   const vendorToken = localStorage.getItem('authToken') || localStorage.getItem('vendorToken');
   const vendorId = localStorage.getItem('vendorId');
+  
+  // File upload refs
+  const coverImageInputRef = useRef(null);
+  const profileImageInputRef = useRef(null);
+  const portfolioImageInputRef = useRef(null);
 
   // State Management
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingProfile, setUploadingProfile] = useState(false);
+  const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [notification, setNotification] = useState(null);
+  
+  // Portfolio Photos
+  const [portfolioPhotos, setPortfolioPhotos] = useState([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
   
   // Profile Data - All fields shown in search results
   const [profile, setProfile] = useState({
@@ -71,6 +84,7 @@ const VendorProfileEditor = () => {
 
   useEffect(() => {
     loadProfile();
+    loadPortfolioPhotos();
   }, []);
 
   const loadProfile = async () => {
@@ -97,9 +111,14 @@ const VendorProfileEditor = () => {
 
       const data = await response.json();
       console.log('📦 Full vendor data received:', data.data);
+      console.log('🖼️ Images in response:', {
+        profileImage: data.data?.profileImage || 'None',
+        coverImage: data.data?.coverImage || 'None'
+      });
+      
       if (data.success) {
         const vendor = data.data;
-        setProfile({
+        const newProfile = {
           businessName: vendor.businessName || '',
           ownerName: vendor.name || '',
           serviceType: vendor.serviceType || '',
@@ -124,8 +143,13 @@ const VendorProfileEditor = () => {
           verified: vendor.verified || false,
           rating: vendor.rating || 0,
           totalReviews: vendor.totalReviews || 0
+        };
+        
+        setProfile(newProfile);
+        console.log('✅ Profile state updated with images:', {
+          profileImage: newProfile.profileImage ? 'Has image' : 'Empty',
+          coverImage: newProfile.coverImage ? 'Has image' : 'Empty'
         });
-        console.log('✅ Profile state updated');
       }
     } catch (error) {
       console.error('❌ Error loading profile:', error);
@@ -134,7 +158,21 @@ const VendorProfileEditor = () => {
       setLoading(false);
     }
   };
-
+  const loadPortfolioPhotos = async () => {
+    setLoadingPhotos(true);
+    try {
+      const response = await getVendorMedia();
+      if (response.success) {
+        setPortfolioPhotos(response.data || []);
+        console.log('✅ Loaded portfolio photos:', response.data.length);
+      }
+    } catch (error) {
+      console.error('❌ Error loading portfolio photos:', error);
+      showNotification('error', 'Failed to load portfolio photos');
+    } finally {
+      setLoadingPhotos(false);
+    }
+  };
   const handleEdit = () => {
     setTempProfile({ ...profile });
     setEditMode(true);
@@ -148,30 +186,39 @@ const VendorProfileEditor = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/vendor-profile/profile/update`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${vendorToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(tempProfile)
+      console.log('💾 Saving profile with images:', {
+        profileImage: tempProfile.profileImage ? tempProfile.profileImage.substring(0, 60) + '...' : 'None',
+        coverImage: tempProfile.coverImage ? tempProfile.coverImage.substring(0, 60) + '...' : 'None',
+        businessName: tempProfile.businessName
       });
-
-      const data = await response.json();
       
-      if (data.success) {
+      const response = await updateVendorProfile(tempProfile);
+      
+      console.log('📡 Backend response:', response);
+      
+      if (response.success) {
+        console.log('✅ Backend saved successfully');
+        console.log('📸 Saved vendor data:', {
+          profileImage: response.data?.profileImage || 'None',
+          coverImage: response.data?.coverImage || 'None'
+        });
+        
+        // Update profile state with response data to ensure sync
         setProfile(tempProfile);
         setEditMode(false);
         setTempProfile(null);
         showNotification('success', 'Profile updated successfully! Changes are live in search results.');
         
-        // Reload to reflect changes
-        setTimeout(() => loadProfile(), 500);
+        // Reload profile after short delay to verify persistence
+        console.log('🔄 Reloading profile to verify save...');
+        setTimeout(() => {
+          loadProfile();
+        }, 1000);
       } else {
-        throw new Error(data.message || 'Failed to update profile');
+        throw new Error(response.message || 'Failed to update profile');
       }
     } catch (error) {
-      console.error('Error saving profile:', error);
+      console.error('❌ Error saving profile:', error);
       showNotification('error', error.message || 'Failed to save changes');
     } finally {
       setSaving(false);
@@ -200,6 +247,156 @@ const VendorProfileEditor = () => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
   };
+
+  // ==================== IMAGE UPLOAD HANDLERS ====================
+  
+  const handleCoverImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showNotification('error', 'Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('error', 'Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingCover(true);
+    try {
+      console.log('📤 Uploading cover image...');
+      const result = await uploadVendorImage(file);
+      
+      console.log('✅ Cover image uploaded to Cloudinary:', result.url);
+      
+      // Update temp profile with new image URL
+      setTempProfile(prev => ({
+        ...prev,
+        coverImage: result.url
+      }));
+      
+      console.log('✅ Cover image added to tempProfile, click Save to persist');
+      showNotification('success', 'Cover image uploaded! Click Save to apply changes.');
+    } catch (error) {
+      console.error('❌ Cover upload error:', error);
+      showNotification('error', error.message || 'Failed to upload cover image');
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const handleProfileImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showNotification('error', 'Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('error', 'Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingProfile(true);
+    try {
+      console.log('📤 Uploading profile image...');
+      const result = await uploadVendorImage(file);
+      
+      console.log('✅ Profile image uploaded to Cloudinary:', result.url);
+      
+      // Update temp profile with new image URL
+      setTempProfile(prev => ({
+        ...prev,
+        profileImage: result.url
+      }));
+      
+      console.log('✅ Profile image added to tempProfile, click Save to persist');
+      showNotification('success', 'Profile image uploaded! Click Save to apply changes.');
+    } catch (error) {
+      console.error('❌ Profile image upload error:', error);
+      showNotification('error', error.message || 'Failed to upload profile image');
+    } finally {
+      setUploadingProfile(false);
+    }
+  };
+
+  const handlePortfolioUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showNotification('error', 'Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('error', 'Image size must be less than 5MB');
+      return;
+    }
+
+    // Check portfolio limit (10 photos)
+    if (portfolioPhotos.length >= 10) {
+      showNotification('error', 'Maximum 10 portfolio photos allowed');
+      return;
+    }
+
+    setUploadingPortfolio(true);
+    try {
+      console.log('📤 Uploading portfolio image...');
+      const result = await uploadVendorImage(file);
+      
+      // Save to database
+      const mediaData = {
+        url: result.url,
+        publicId: result.publicId,
+        type: 'image',
+        caption: ''
+      };
+      
+      const response = await addVendorMedia(mediaData);
+      if (response.success) {
+        setPortfolioPhotos(prev => [...prev, response.data]);
+        showNotification('success', 'Portfolio photo added successfully!');
+      }
+    } catch (error) {
+      console.error('❌ Portfolio upload error:', error);
+      showNotification('error', error.message || 'Failed to upload portfolio photo');
+    } finally {
+      setUploadingPortfolio(false);
+      // Reset file input
+      if (portfolioImageInputRef.current) {
+        portfolioImageInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDeletePhoto = async (photoId) => {
+    if (!window.confirm('Are you sure you want to delete this photo?')) {
+      return;
+    }
+
+    try {
+      const response = await deleteVendorMedia(photoId);
+      if (response.success) {
+        setPortfolioPhotos(prev => prev.filter(photo => photo._id !== photoId));
+        showNotification('success', 'Photo deleted successfully!');
+      }
+    } catch (error) {
+      console.error('❌ Delete photo error:', error);
+      showNotification('error', error.message || 'Failed to delete photo');
+    }
+  };
+
 
   const currentData = editMode ? tempProfile : profile;
 
@@ -244,9 +441,26 @@ const VendorProfileEditor = () => {
         
         {/* Edit Cover Button */}
         {editMode && (
-          <button className="absolute top-4 right-4 bg-white bg-opacity-90 hover:bg-opacity-100 p-3 rounded-xl shadow-lg transition-all">
-            <Camera className="w-5 h-5 text-gray-700" />
-          </button>
+          <>
+            <input
+              ref={coverImageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCoverImageUpload}
+              className="hidden"
+            />
+            <button 
+              onClick={() => coverImageInputRef.current?.click()}
+              disabled={uploadingCover}
+              className="absolute top-4 right-4 bg-white bg-opacity-90 hover:bg-opacity-100 p-3 rounded-xl shadow-lg transition-all disabled:opacity-50"
+            >
+              {uploadingCover ? (
+                <Loader2 className="w-5 h-5 text-gray-700 animate-spin" />
+              ) : (
+                <Camera className="w-5 h-5 text-gray-700" />
+              )}
+            </button>
+          </>
         )}
       </div>
 
@@ -266,9 +480,26 @@ const VendorProfileEditor = () => {
                 )}
               </div>
               {editMode && (
-                <button className="absolute bottom-0 right-0 bg-indigo-600 hover:bg-indigo-700 p-2 rounded-full shadow-lg transition-all">
-                  <Camera className="w-4 h-4 text-white" />
-                </button>
+                <>
+                  <input
+                    ref={profileImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfileImageUpload}
+                    className="hidden"
+                  />
+                  <button 
+                    onClick={() => profileImageInputRef.current?.click()}
+                    disabled={uploadingProfile}
+                    className="absolute bottom-0 right-0 bg-indigo-600 hover:bg-indigo-700 p-2 rounded-full shadow-lg transition-all disabled:opacity-50"
+                  >
+                    {uploadingProfile ? (
+                      <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4 text-white" />
+                    )}
+                  </button>
+                </>
               )}
               {currentData.verified && (
                 <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
@@ -649,6 +880,87 @@ const VendorProfileEditor = () => {
                   <span className="text-gray-600">Team Size</span>
                   <span className="font-bold text-indigo-600">{currentData.teamSize || 'Not set'}</span>
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Portfolio Photos Section */}
+      <div className="mx-6 mb-8">
+        <div className="bg-white rounded-2xl border-2 border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-6 border-b-2 border-gray-100 bg-gradient-to-r from-purple-50 to-pink-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Portfolio Photos</h2>
+                <p className="text-sm text-gray-600">
+                  Showcase your work ({portfolioPhotos.length}/10 photos)
+                </p>
+              </div>
+              <button
+                onClick={() => portfolioImageInputRef.current?.click()}
+                disabled={uploadingPortfolio || portfolioPhotos.length >= 10}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {uploadingPortfolio ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-5 h-5" />
+                    Add Photo
+                  </>
+                )}
+              </button>
+              <input
+                ref={portfolioImageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePortfolioUpload}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          <div className="p-6">
+            {loadingPhotos ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <span className="ml-3 text-gray-600">Loading photos...</span>
+              </div>
+            ) : portfolioPhotos.length === 0 ? (
+              <div className="text-center py-12">
+                <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 mb-2">No portfolio photos yet</p>
+                <p className="text-sm text-gray-400">Add photos to showcase your work to potential customers</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {portfolioPhotos.map((photo) => (
+                  <div 
+                    key={photo._id} 
+                    className="relative group aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-purple-500 transition-all"
+                  >
+                    <img
+                      src={photo.url}
+                      alt="Portfolio"
+                      className="w-full h-full object-cover"
+                    />
+                    {photo.isFeatured && (
+                      <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                        Featured
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleDeletePhoto(photo._id)}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

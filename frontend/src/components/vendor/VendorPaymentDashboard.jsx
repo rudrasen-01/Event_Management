@@ -46,21 +46,21 @@ const VendorPaymentDashboard = () => {
       gradient: 'from-blue-100 to-blue-50',
       iconBg: 'bg-blue-100',
       iconColor: 'text-blue-600',
-      price: 999,
+      price: 499,
       name: 'Starter',
       duration: 'per month',
-      features: ['Verified badge', 'Up to 15 images/videos', 'Higher search ranking', 'Blog posts enabled', 'Priority customer support']
+      features: ['Verified vendor badge', 'Up to 15 images/videos', 'Improved placement in search results', 'Category + location SEO optimization', 'Profile reviewed & managed by AIS team']
     },
     growth: {
-      icon: TrendingUp,
-      color: 'indigo',
-      gradient: 'from-indigo-100 to-indigo-50',
-      iconBg: 'bg-indigo-100',
-      iconColor: 'text-indigo-600',
-      price: 2499,
+      icon: Star,
+      color: 'purple',
+      gradient: 'from-purple-100 to-purple-50',
+      iconBg: 'bg-purple-100',
+      iconColor: 'text-purple-600',
+      price: 999,
       name: 'Growth',
       duration: 'per month',
-      features: ['Featured placement', 'Up to 30 images/videos', 'Top search priority', 'Unlimited blog posts', 'Advanced analytics', 'Social media promotion']
+      features: ['Up to 30 images/videos', 'Everything in Starter', 'Higher ranking in category searches', 'Featured placement in recommended vendors', 'Portfolio enhancement', 'Basic social media promotion']
     },
     premium: {
       icon: Crown,
@@ -68,10 +68,10 @@ const VendorPaymentDashboard = () => {
       gradient: 'from-amber-100 to-amber-50',
       iconBg: 'bg-amber-100',
       iconColor: 'text-amber-600',
-      price: 4999,
+      price: 1499,
       name: 'Premium',
       duration: 'per month',
-      features: ['Premium badge', 'Unlimited portfolio', 'Maximum visibility', 'Featured on homepage', 'Dedicated account manager', 'Custom branding options', 'Priority in all categories']
+      features: ['Unlimited portfolio showcase', 'Top-tier visibility in search results', 'Premium verified badge', 'Social media shoutouts & promotions', 'Dedicated profile optimization', 'Priority placement during high-demand searches']
     }
   };
 
@@ -698,7 +698,7 @@ const VendorPaymentDashboard = () => {
                     <div className="mb-4">
                       <h3 className="text-xl font-bold text-gray-900">Starter</h3>
                       <div className="mt-2">
-                        <span className="text-3xl font-bold text-gray-900">₹999</span>
+                        <span className="text-3xl font-bold text-gray-900">₹499</span>
                         <span className="text-gray-600 text-sm">/month</span>
                       </div>
                       <p className="text-xs text-gray-600 mt-1">+ 18% GST</p>
@@ -719,22 +719,22 @@ const VendorPaymentDashboard = () => {
                   {/* Growth Plan */}
                   <div 
                     onClick={() => handleSelectUpgradePlan('growth')}
-                    className="relative border-2 border-indigo-300 rounded-2xl p-6 hover:border-indigo-500 cursor-pointer transition-all hover:shadow-lg group bg-gradient-to-br from-indigo-50 to-white"
+                    className="relative border-2 border-purple-300 rounded-2xl p-6 hover:border-purple-500 cursor-pointer transition-all hover:shadow-lg group bg-gradient-to-br from-purple-50 to-white"
                   >
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                      <span className="px-3 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold rounded-full">
+                      <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold rounded-full">
                         POPULAR
                       </span>
                     </div>
                     <div className="absolute top-4 right-4">
-                      <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <TrendingUp className="w-6 h-6 text-indigo-600" />
+                      <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Star className="w-6 h-6 text-purple-600" />
                       </div>
                     </div>
                     <div className="mb-4">
                       <h3 className="text-xl font-bold text-gray-900">Growth</h3>
                       <div className="mt-2">
-                        <span className="text-3xl font-bold text-gray-900">₹2,499</span>
+                        <span className="text-3xl font-bold text-gray-900">₹999</span>
                         <span className="text-gray-600 text-sm">/month</span>
                       </div>
                       <p className="text-xs text-gray-600 mt-1">+ 18% GST</p>
@@ -747,7 +747,7 @@ const VendorPaymentDashboard = () => {
                         </li>
                       ))}
                     </ul>
-                    <button className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all group-hover:shadow-md">
+                    <button className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-xl transition-all group-hover:shadow-md">
                       Select Plan
                     </button>
                   </div>
@@ -765,7 +765,7 @@ const VendorPaymentDashboard = () => {
                     <div className="mb-4">
                       <h3 className="text-xl font-bold text-gray-900">Premium</h3>
                       <div className="mt-2">
-                        <span className="text-3xl font-bold text-gray-900">₹4,999</span>
+                        <span className="text-3xl font-bold text-gray-900">₹1,499</span>
                         <span className="text-gray-600 text-sm">/month</span>
                       </div>
                       <p className="text-xs text-gray-600 mt-1">+ 18% GST</p>

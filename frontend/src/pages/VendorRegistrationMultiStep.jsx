@@ -1,19 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle, Search, MapPin, Phone, Mail, Camera, Clock, 
   ChevronRight, ChevronLeft, Home, Building2, User, IndianRupee,
   Calendar, Shield, Check, AlertCircle, Zap, TrendingUp, Star,
   Award, Eye, Sparkles, Crown, CreditCard, Smartphone, Wallet,
-  Building, Lock, ArrowRight, Info
+  Building, Lock, ArrowRight, Info, Upload, X, Loader2, Image as ImageIcon
 } from 'lucide-react';
 import { getAllServices } from '../services/taxonomyService';
 import { fetchCities } from '../services/dynamicDataService';
 import { getApiUrl } from '../config/api';
 import VendorLoginModal from '../components/VendorLoginModal';
+import { uploadVendorImage } from '../services/vendorService';
 
 const VendorRegistrationMultiStep = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -23,6 +26,10 @@ const VendorRegistrationMultiStep = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [showManualCategory, setShowManualCategory] = useState(false);
+  
+  // Photo upload states
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Payment gateway state management
   const [paymentState, setPaymentState] = useState('idle'); // idle | initiating | processing | verifying | success | failed | cancelled
@@ -36,6 +43,9 @@ const VendorRegistrationMultiStep = () => {
   const [cities, setCities] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(true);
   const [citiesLoading, setCitiesLoading] = useState(true);
+  
+  // Field-level errors for better UX
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const totalSteps = 7;
 
@@ -60,16 +70,18 @@ const VendorRegistrationMultiStep = () => {
     {
       id: 'starter',
       name: 'Starter',
-      price: 999,
+      price: 499,
       duration: 'per month',
       popular: false,
       icon: Zap,
       color: 'blue',
+      trialDays: 30,
       features: [
+        'First 30 days free trial',
         'Verified badge',
         'Up to 15 images/videos',
         'Higher search ranking',
-        'Blog posts enabled',
+        'Profile managed by AIS team',
         'Priority customer support'
       ],
       limitations: []
@@ -77,17 +89,18 @@ const VendorRegistrationMultiStep = () => {
     {
       id: 'growth',
       name: 'Growth',
-      price: 2499,
+      price: 999,
       duration: 'per month',
       popular: true,
       icon: TrendingUp,
       color: 'indigo',
+      trialDays: 30,
       features: [
+        'First 30 days free trial',
         'Featured placement',
         'Up to 30 images/videos',
         'Top search priority',
-        'Unlimited blog posts',
-        'Advanced analytics',
+        'Portfolio enhancement',
         'Social media promotion'
       ],
       limitations: []
@@ -95,19 +108,20 @@ const VendorRegistrationMultiStep = () => {
     {
       id: 'premium',
       name: 'Premium',
-      price: 4999,
+      price: 1499,
       duration: 'per month',
       popular: false,
       icon: Crown,
       color: 'amber',
+      trialDays: 30,
       features: [
+        'First 30 days free trial',
         'Premium badge',
         'Unlimited portfolio',
         'Maximum visibility',
-        'Featured on homepage',
-        'Dedicated account manager',
-        'Custom branding options',
-        'Priority in all categories'
+        'Social media shoutouts',
+        'Dedicated optimization',
+        'Priority in high-demand searches'
       ],
       limitations: []
     }
@@ -197,7 +211,21 @@ const VendorRegistrationMultiStep = () => {
   }, []);
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    console.log(`✏️ Field Changed: ${field} = "${value}" (type: ${typeof value})`);
+    
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      console.log(`   Updated formData.${field}:`, updated[field]);
+      return updated;
+    });
+    
+    // Clear field-specific error when user types
+    if (fieldErrors[field]) {
+      console.log(`   Clearing error for field: ${field}`);
+      setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    // Clear general error
     setError('');
   };
 
@@ -210,58 +238,243 @@ const VendorRegistrationMultiStep = () => {
     }));
   };
 
+  // ==================== PHOTO UPLOAD HANDLERS ====================
+  const handlePhotoUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    // Validate total number of photos
+    const currentPhotos = formData.photos.length;
+    if (currentPhotos + files.length > 10) {
+      setError(`Maximum 10 photos allowed. You can upload ${10 - currentPhotos} more.`);
+      return;
+    }
+
+    setUploadingPhotos(true);
+    setUploadProgress(0);
+    const uploadedPhotos = [];
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          console.warn(`Skipping non-image file: ${file.name}`);
+          continue;
+        }
+
+        // Validate file size (max 5MB per image)
+        if (file.size > 5 * 1024 * 1024) {
+          setError(`${file.name} is too large. Maximum size is 5MB.`);
+          continue;
+        }
+
+        console.log(`📤 Uploading image ${i + 1}/${files.length}: ${file.name}`);
+        
+        try {
+          const result = await uploadVendorImage(file);
+          uploadedPhotos.push({
+            url: result.url,
+            publicId: result.publicId
+          });
+          
+          setUploadProgress(Math.round(((i + 1) / files.length) * 100));
+        } catch (uploadError) {
+          console.error(`❌ Failed to upload ${file.name}:`, uploadError);
+          setError(`Failed to upload ${file.name}. Please try again.`);
+        }
+      }
+
+      // Add uploaded photos to formData
+      if (uploadedPhotos.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          photos: [...prev.photos, ...uploadedPhotos]
+        }));
+        console.log(`✅ Successfully uploaded ${uploadedPhotos.length} photos`);
+      }
+    } catch (error) {
+      console.error('❌ Photo upload error:', error);
+      setError(error.message || 'Failed to upload photos');
+    } finally {
+      setUploadingPhotos(false);
+      setUploadProgress(0);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemovePhoto = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index)
+    }));
+  };
+
+
   const validateStep = (step) => {
+    console.log('\n🔍 ========== VALIDATION START ==========');
+    console.log('Current Step:', step);
+    console.log('Form Data:', formData);
+    
+    // Clear previous field errors
+    setFieldErrors({});
+    
     switch (step) {
       case 1:
-        if (!formData.serviceType && !formData.customService.trim()) return 'Please select or enter a business category';
+        if (!formData.serviceType && !formData.customService.trim()) {
+          setFieldErrors({ serviceType: 'Please select or enter a business category' });
+          return 'Please select or enter a business category';
+        }
         break;
+        
       case 2:
-        if (!formData.businessName.trim()) return 'Business name is required';
-        if (!formData.city) return 'Please select your city';
-        if (!formData.area.trim() && !formData.street.trim()) return 'Please enter area or street';
+        console.log('\n📋 Step 2 Validation Details:');
+        console.log('  businessName:', `"${formData.businessName}"`, '(length:', formData.businessName?.length, ')');
+        console.log('  city:', `"${formData.city}"`, '(type:', typeof formData.city, ')');
+        console.log('  pincode:', `"${formData.pincode}"`, '(length:', formData.pincode?.length, ')');
+        console.log('  area:', `"${formData.area}"`, '(length:', formData.area?.length, ')');
+        console.log('  street:', `"${formData.street}"`, '(length:', formData.street?.length, ')');
+        console.log('  cities available:', cities.length);
+        
+        const step2Errors = {};
+        
+        // Business Name - Required
+        const businessNameValue = String(formData.businessName || '').trim();
+        if (!businessNameValue) {
+          console.log('  ❌ Business name is empty');
+          step2Errors.businessName = 'Business name is required';
+        } else {
+          console.log('  ✓ Business name OK');
+        }
+        
+        // City - Required
+        const cityValue = String(formData.city || '').trim();
+        if (!cityValue) {
+          console.log('  ❌ City is empty');
+          step2Errors.city = 'Please select your city';
+        } else {
+          console.log('  ✓ City OK:', cityValue);
+        }
+        
+        // Pincode - Required and must be 6 digits
+        const pincodeValue = String(formData.pincode || '').trim();
+        if (!pincodeValue) {
+          console.log('  ❌ Pincode is empty');
+          step2Errors.pincode = 'Pincode is required';
+        } else if (!/^\d{6}$/.test(pincodeValue)) {
+          console.log('  ❌ Pincode invalid format:', pincodeValue);
+          step2Errors.pincode = 'Enter valid 6-digit pincode';
+        } else {
+          console.log('  ✓ Pincode OK:', pincodeValue);
+        }
+        
+        // Area OR Street - at least one required
+        const areaValue = String(formData.area || '').trim();
+        const streetValue = String(formData.street || '').trim();
+        
+        if (!areaValue && !streetValue) {
+          console.log('  ❌ Both area and street are empty');
+          step2Errors.area = 'Please enter area or street';
+          step2Errors.street = 'Please enter area or street';
+        } else {
+          console.log('  ✓ Area/Street OK - Area:', areaValue, 'Street:', streetValue);
+        }
+        
+        if (Object.keys(step2Errors).length > 0) {
+          console.error('\n❌ Step 2 Validation FAILED!');
+          console.error('Errors:', step2Errors);
+          console.log('========== VALIDATION END ==========\n');
+          setFieldErrors(step2Errors);
+          return Object.values(step2Errors)[0];
+        }
+        
+        console.log('\n✅ Step 2 Validation PASSED!');
+        console.log('========== VALIDATION END ==========\n');
         break;
       case 3:
-        if (formData.workingDays.length === 0) return 'Select at least one working day';
+        if (formData.workingDays.length === 0) {
+          setFieldErrors({ workingDays: 'Select at least one working day' });
+          return 'Select at least one working day';
+        }
         break;
       case 4:
-        if (!formData.contactPerson.trim()) return 'Contact person name is required';
+        const step4Errors = {};
+        
+        if (!formData.contactPerson.trim()) {
+          step4Errors.contactPerson = 'Contact person name is required';
+        }
+        
         const phoneDigits = formData.phone.replace(/\D/g, '');
         if (phoneDigits.length !== 10 || !/^[6-9]/.test(phoneDigits)) {
-          return 'Enter valid 10-digit mobile number';
+          step4Errors.phone = 'Enter valid 10-digit mobile number';
         }
+        
         if (!formData.email || !/^\S+@\S+\.\S+$/.test(formData.email)) {
-          return 'Enter valid email address';
+          step4Errors.email = 'Enter valid email address';
         }
+        
         if (!formData.password || formData.password.length < 6) {
-          return 'Password must be at least 6 characters';
+          step4Errors.password = 'Password must be at least 6 characters';
         }
+        
         if (formData.password !== formData.confirmPassword) {
-          return 'Passwords do not match';
+          step4Errors.confirmPassword = 'Passwords do not match';
+        }
+        
+        if (Object.keys(step4Errors).length > 0) {
+          setFieldErrors(step4Errors);
+          return Object.values(step4Errors)[0];
         }
         break;
       case 5:
         break;
       case 6:
         // Plan selection validation - Free plan is always valid
-        if (!formData.selectedPlan) return 'Please select a visibility plan';
+        if (!formData.selectedPlan) {
+          setFieldErrors({ selectedPlan: 'Please select a visibility plan' });
+          return 'Please select a visibility plan';
+        }
         break;
       case 7:
-        if (!formData.minPrice || !formData.maxPrice) return 'Enter your pricing range';
-        if (Number(formData.minPrice) >= Number(formData.maxPrice)) return 'Max price must be greater than min';
-        if (Number(formData.minPrice) < 100) return 'Minimum price seems too low';
+        const step7Errors = {};
+        
+        if (!formData.minPrice || !formData.maxPrice) {
+          step7Errors.pricing = 'Enter your pricing range';
+        } else if (Number(formData.minPrice) >= Number(formData.maxPrice)) {
+          step7Errors.maxPrice = 'Max price must be greater than min';
+        } else if (Number(formData.minPrice) < 100) {
+          step7Errors.minPrice = 'Minimum price seems too low';
+        }
+        
+        if (Object.keys(step7Errors).length > 0) {
+          setFieldErrors(step7Errors);
+          return Object.values(step7Errors)[0];
+        }
         break;
     }
     return null;
   };
 
   const nextStep = () => {
+    console.log('\n🚀 Next Step Button Clicked');
+    console.log('Current Step:', currentStep);
+    
     const validationError = validateStep(currentStep);
+    
     if (validationError) {
+      console.log('⛔ Blocking step advancement due to validation error');
       setError(validationError);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    
+    console.log('✅ Advancing to step', currentStep + 1);
     setError('');
+    
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -270,10 +483,24 @@ const VendorRegistrationMultiStep = () => {
 
   const prevStep = () => {
     setError('');
+    setFieldErrors({});
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+  
+  // Helper function to get input CSS classes with error styling
+  const getInputClass = (fieldName, baseClass = 'w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none') => {
+    return fieldErrors[fieldName] 
+      ? `${baseClass} border-red-500 bg-red-50` 
+      : baseClass;
+  };
+  
+  // Helper to show field error message
+  const FieldError = ({ fieldName }) => {
+    if (!fieldErrors[fieldName]) return null;
+    return <p className="text-red-600 text-sm mt-1">{fieldErrors[fieldName]}</p>;
   };
 
   const handleReset = () => {
@@ -340,7 +567,7 @@ const VendorRegistrationMultiStep = () => {
       const payload = {
         name: formData.contactPerson.trim(),
         businessName: formData.businessName.trim(),
-      serviceType: formData.serviceType || formData.customService.trim(),
+        serviceType: formData.serviceType || formData.customService.trim(),
         location: {
           type: 'Point',
           coordinates: [lng, lat]
@@ -367,10 +594,13 @@ const VendorRegistrationMultiStep = () => {
         },
         password: formData.password,
         yearsInBusiness: formData.yearsInBusiness ? Number(formData.yearsInBusiness) : undefined,
-        description: formData.description.trim() || undefined
+        description: formData.description.trim() || undefined,
+        photos: formData.photos || [] // Include uploaded Cloudinary photos
       };
 
-      const response = await fetch(getApiUrl('vendors/register'), {
+      console.log('📤 Registration payload:', { ...payload, password: '***' });
+
+      const response = await fetch('http://localhost:5000/api/vendors/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -380,6 +610,11 @@ const VendorRegistrationMultiStep = () => {
 
       if (!response.ok) {
         throw new Error(data.error?.message || data.message || 'Registration failed');
+      }
+
+      console.log('✅ Vendor registration successful:', data);
+      if (data.data?.mediaUploaded) {
+        console.log(`📸 ${data.data.mediaUploaded} photos uploaded successfully`);
       }
 
       setSuccess(true);
@@ -406,6 +641,7 @@ const VendorRegistrationMultiStep = () => {
     handleChange('serviceType', service.value);
     setCategorySearch(service.label);
     setShowCategoryDropdown(false);
+    handleChange('customService', ''); // Clear manual entry
   };
 
   const handleLoginSuccess = (vendor) => {
@@ -595,14 +831,20 @@ const VendorRegistrationMultiStep = () => {
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 py-6">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          {/* Error Message */}
-          {error && (
-            <div className="mx-6 mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
-              {error}
+        {/* Error Message - Sticky at top */}
+        {error && (
+          <div className="sticky top-0 z-50 mb-4 bg-red-100 border-l-4 border-red-500 text-red-800 px-6 py-4 rounded shadow-lg">
+            <div className="flex items-start">
+              <span className="text-2xl mr-3">⚠️</span>
+              <div className="flex-1">
+                <p className="font-semibold text-base">{error}</p>
+                <p className="text-sm mt-1">Please fill the required fields correctly before proceeding.</p>
+              </div>
             </div>
-          )}
-
+          </div>
+        )}
+        
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="p-6">
             {/* Step 1: Business Category */}
             {currentStep === 1 && (
@@ -620,162 +862,106 @@ const VendorRegistrationMultiStep = () => {
                   </div>
                 )}
 
-                {/* Searchable Dropdown */}
+                {/* Unified Category Browser */}
                 {!servicesLoading && (
-                  <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
                       Business Category <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="text"
-                        value={categorySearch}
-                        onChange={(e) => {
-                          setCategorySearch(e.target.value);
-                          setShowCategoryDropdown(true);
-                          if (e.target.value === '') {
-                            handleChange('serviceType', '');
-                          }
-                        }}
-                        onFocus={() => setShowCategoryDropdown(true)}
-                        placeholder="Type to search (e.g., photographer, caterer, DJ, makeup)"
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    />
-                    
-                    {/* Dropdown Results - Grouped by Category */}
-                    {showCategoryDropdown && categorySearch && filteredServices.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                        {(() => {
-                          // Group services by category
-                          const grouped = filteredServices.reduce((acc, service) => {
-                            if (!acc[service.category]) {
-                              acc[service.category] = [];
-                            }
-                            acc[service.category].push(service);
-                            return acc;
-                          }, {});
-
-                          return Object.entries(grouped).map(([category, services]) => (
-                            <div key={category} className="border-b border-gray-100 last:border-b-0">
-                              <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase tracking-wide sticky top-0">
-                                {category}
-                              </div>
-                              {services.map((service) => (
-                                <button
-                                  key={service.value}
-                                  type="button"
-                                  onClick={() => handleCategorySelect(service)}
-                                  className={`w-full px-4 py-2.5 text-left hover:bg-blue-50 flex items-center gap-3
-                                            ${formData.serviceType === service.value ? 'bg-blue-50' : ''}`}
-                                >
-                                  <span className="text-xl">{service.icon}</span>
-                                  <span className="text-sm text-gray-900">{service.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    )}
-                    
-                    {/* No Results */}
-                    {showCategoryDropdown && categorySearch && filteredServices.length === 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
-                        <p className="text-sm text-gray-600">No categories found matching "{categorySearch}"</p>
-                      </div>
-                    )}
-                    </div>
 
                     {/* Selected Category Display */}
                     {(formData.serviceType || formData.customService) && (
-                      <div className="mt-3 bg-green-50 border border-green-200 rounded p-3 flex items-center gap-2">
+                      <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
                         <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
                         <span className="text-sm text-green-800 font-medium">
                           Selected: {formData.serviceType ? (vendorServices.find(s => s.value === formData.serviceType)?.label) : formData.customService}
                         </span>
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* Browse by Category - Show when search is empty */}
-                {!categorySearch && !servicesLoading && (
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-4">Browse by category or type your category manually below</p>
-                      <button
-                        type="button"
-                        onClick={() => setShowManualCategory(prev => !prev)}
-                        className="text-xs text-indigo-600 hover:underline"
-                      >
-                        {showManualCategory ? 'Choose from list' : "Can't find your category? Enter manually"}
-                      </button>
+                    {/* Services List with Search */}
+                    <div className="border-2 border-gray-300 rounded-lg shadow-md overflow-hidden">
+                      {/* Search within categories */}
+                      <div className="p-3 bg-gray-50 border-b border-gray-200">
+                        <div className="relative">
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
+                          <input
+                            type="text"
+                            value={categorySearch}
+                            onChange={(e) => setCategorySearch(e.target.value)}
+                            placeholder="Search categories (e.g., photographer, caterer, DJ, makeup)"
+                            className="w-full h-12 pl-12 pr-4 border-2 border-gray-300 rounded-lg text-sm font-semibold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Scrollable services list */}
+                      <div className="max-h-64 overflow-y-auto">
+                        {[
+                          'Venues',
+                          'Event Planning',
+                          'Decor & Styling',
+                          'Photography & Videography',
+                          'Food & Catering',
+                          'Music & Entertainment',
+                          'Sound, Light & Technical',
+                          'Rentals & Infrastructure',
+                          'Beauty & Personal Services',
+                          'Religious & Ritual Services',
+                          'Invitations, Gifts & Printing',
+                          'Logistics & Support Services',
+                          'Others'
+                        ].map((cat) => {
+                          const categoryServices = filteredServices.filter(s => s.category === cat);
+                          if (categoryServices.length === 0) return null;
+                          
+                          return (
+                            <div key={cat} className="border-t border-gray-100 first:border-t-0">
+                              <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-600 uppercase tracking-wide sticky top-0">
+                                {cat}
+                              </div>
+                              <div className="bg-white">
+                                {categoryServices.map((service) => (
+                                  <button
+                                    key={service.value}
+                                    type="button"
+                                    onClick={() => handleCategorySelect(service)}
+                                    className={`w-full px-4 py-2.5 text-left hover:bg-blue-50 flex items-center gap-3 border-t border-gray-50 first:border-t-0 transition-colors
+                                              ${formData.serviceType === service.value ? 'bg-blue-50 border-blue-200' : ''}`}
+                                  >
+                                    <span className="text-xl flex-shrink-0">{service.icon}</span>
+                                    <span className="text-sm text-gray-700 flex-1">{service.label}</span>
+                                    {formData.serviceType === service.value && (
+                                      <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
-                    {showManualCategory && (
-                      <div className="mb-4">
-                        <label className="text-xs text-gray-600 mb-1 block">Enter your service / business category</label>
-                        <input
-                          type="text"
-                          value={formData.customService}
-                          onChange={(e) => handleChange('customService', e.target.value)}
-                          placeholder="e.g. Luxury Wedding Rentals"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
-                        />
+                    {/* Manual Category Entry - Below Dropdown */}
+                    <div className="mt-4 p-4 bg-gray-50 border border-gray-300 rounded-lg">
+                      <div className="flex items-start gap-2 mb-3">
+                        <Info className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-1">Can't find your category?</p>
+                          <p className="text-xs text-gray-600">Enter your service or business category manually below</p>
+                        </div>
                       </div>
-                    )}
-                    <div className="space-y-3">
-                      {/** When manual input is active we still show list below if user wants to pick */}
-                      {[
-                        'Venues',
-                        'Event Planning',
-                        'Decor & Styling',
-                        'Photography & Videography',
-                        'Food & Catering',
-                        'Music & Entertainment',
-                        'Sound, Light & Technical',
-                        'Rentals & Infrastructure',
-                        'Beauty & Personal Services',
-                        'Religious & Ritual Services',
-                        'Invitations, Gifts & Printing',
-                        'Logistics & Support Services',
-                        'Others'
-                      ].map((cat) => {
-                        const categoryServices = vendorServices.filter(s => s.category === cat);
-                        if (categoryServices.length === 0) return null;
-                        
-                        return (
-                          <div key={cat} className="border border-gray-200 rounded-lg overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                const content = e.currentTarget.nextElementSibling;
-                                content.classList.toggle('hidden');
-                              }}
-                              className="w-full px-4 py-3 bg-gray-50 text-left flex items-center justify-between hover:bg-gray-100"
-                            >
-                              <span className="text-sm font-semibold text-gray-700">{cat}</span>
-                              <ChevronRight className="w-4 h-4 text-gray-500" />
-                            </button>
-                            <div className="hidden bg-white">
-                              {categoryServices.map((service) => (
-                                <button
-                                  key={service.value}
-                                  type="button"
-                                  onClick={() => handleCategorySelect(service)}
-                                  className={`w-full px-4 py-2.5 text-left hover:bg-blue-50 flex items-center gap-3 border-t border-gray-100
-                                            ${formData.serviceType === service.value ? 'bg-blue-50' : ''}`}
-                                >
-                                  <span className="text-xl">{service.icon}</span>
-                                  <span className="text-sm text-gray-700">{service.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      <input
+                        type="text"
+                        value={formData.customService}
+                        onChange={(e) => {
+                          handleChange('customService', e.target.value);
+                          handleChange('serviceType', ''); // Clear dropdown selection
+                        }}
+                        placeholder="e.g. Luxury Wedding Rentals, Event Photography, etc."
+                        className="w-full px-4 py-2.5 text-sm font-medium border-2 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                   </div>
                 )}
@@ -785,9 +971,46 @@ const VendorRegistrationMultiStep = () => {
             {/* Step 2: Business Details */}
             {currentStep === 2 && (
               <div className="space-y-6">
+                {/* Debug Info - Remove in production */}
+                <div className="bg-gray-50 border border-gray-200 rounded p-3 text-xs font-mono">
+                  <div className="font-bold mb-2">🔍 Debug Info (Remove in production):</div>
+                  <div>businessName: "{formData.businessName}" ({formData.businessName?.length} chars)</div>
+                  <div>city: "{formData.city}" (type: {typeof formData.city})</div>
+                  <div>pincode: "{formData.pincode}" ({formData.pincode?.length} chars)</div>
+                  <div>area: "{formData.area}" ({formData.area?.length} chars)</div>
+                  <div>street: "{formData.street}" ({formData.street?.length} chars)</div>
+                  <div>Cities loaded: {cities.length}</div>
+                  <div className="mt-2 text-blue-600">Open browser console (F12) for detailed logs</div>
+                </div>
+                
                 <div>
                   <h2 className="text-lg font-bold text-gray-900 mb-1">Business Details</h2>
-                  <p className="text-sm text-gray-600">Tell us about your business location</p>
+                  <p className="text-sm text-gray-600">
+                    Tell us about your business location. 
+                    <span className="text-red-500 font-medium"> * Required fields</span>
+                  </p>
+                  
+                  {/* Field Completion Tracker */}
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className={`px-2 py-1 rounded ${formData.businessName?.trim() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {formData.businessName?.trim() ? '✓' : '○'} Business Name
+                    </span>
+                    <span className={`px-2 py-1 rounded ${formData.city?.trim() ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {formData.city?.trim() ? '✓' : '○'} City
+                    </span>
+                    <span className={`px-2 py-1 rounded ${formData.pincode?.trim() && /^\d{6}$/.test(formData.pincode) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {formData.pincode?.trim() && /^\d{6}$/.test(formData.pincode) ? '✓' : '○'} Pincode
+                    </span>
+                    <span className={`px-2 py-1 rounded ${(formData.area?.trim() || formData.street?.trim()) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {(formData.area?.trim() || formData.street?.trim()) ? '✓' : '○'} Area/Street
+                    </span>
+                  </div>
+                  
+                  {Object.keys(fieldErrors).length > 0 && (
+                    <div className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded border border-red-200">
+                      ⚠️ {Object.keys(fieldErrors).length} field(s) need attention
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -800,9 +1023,10 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.businessName}
                       onChange={(e) => handleChange('businessName', e.target.value)}
                       placeholder="Enter your business name"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('businessName', 
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="businessName" />
                   </div>
 
                   <div>
@@ -813,8 +1037,8 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.city}
                       onChange={(e) => handleChange('city', e.target.value)}
                       disabled={citiesLoading}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('city',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     >
                       <option value="">
                         {citiesLoading 
@@ -833,12 +1057,13 @@ const VendorRegistrationMultiStep = () => {
                         !citiesLoading && <option value="" disabled>No cities found</option>
                       )}
                     </select>
-                    {!citiesLoading && cities.length === 0 && (
+                    <FieldError fieldName="city" />
+                    {!citiesLoading && cities.length === 0 && !fieldErrors.city && (
                       <p className="text-xs text-red-600 mt-1">
                         ⚠️ No cities loaded. Please refresh the page.
                       </p>
                     )}
-                    {cities.length > 0 && (
+                    {cities.length > 0 && !fieldErrors.city && (
                       <p className="text-xs text-gray-500 mt-1">
                         {cities.length} cities available
                       </p>
@@ -847,17 +1072,21 @@ const VendorRegistrationMultiStep = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Pincode
+                      Pincode <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={formData.pincode}
-                      onChange={(e) => handleChange('pincode', e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, ''); // Only digits
+                        if (value.length <= 6) handleChange('pincode', value);
+                      }}
                       placeholder="452001"
                       maxLength="6"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('pincode',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="pincode" />
                   </div>
 
                   <div>
@@ -897,9 +1126,13 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.street}
                       onChange={(e) => handleChange('street', e.target.value)}
                       placeholder="Street name"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('street',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="street" />
+                    {!fieldErrors.street && (
+                      <p className="text-xs text-gray-500 mt-1">Fill either Street or Area/Locality (at least one required)</p>
+                    )}
                   </div>
 
                   <div>
@@ -911,9 +1144,10 @@ const VendorRegistrationMultiStep = () => {
                       value={formData.area}
                       onChange={(e) => handleChange('area', e.target.value)}
                       placeholder="e.g., Vijay Nagar"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded text-sm
-                               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className={getInputClass('area',
+                        'w-full px-3 py-2.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500')}
                     />
+                    <FieldError fieldName="area" />
                   </div>
 
                   <div>
@@ -1095,13 +1329,77 @@ const VendorRegistrationMultiStep = () => {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900 mb-1">Business Photos (Optional)</h2>
-                  <p className="text-sm text-gray-600">Add photos to showcase your work</p>
+                  <p className="text-sm text-gray-600">Add up to 10 photos to showcase your work</p>
                 </div>
 
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-                  <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-600 mb-2">Photo upload coming soon</p>
-                  <p className="text-xs text-gray-500">You can add photos later from your dashboard</p>
+                {/* Photo Upload Area */}
+                <div className="space-y-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                  
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingPhotos || formData.photos.length >= 10}
+                    className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-500 hover:bg-indigo-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingPhotos ? (
+                      <div className="space-y-3">
+                        <Loader2 className="w-12 h-12 text-indigo-600 mx-auto animate-spin" />
+                        <p className="text-sm text-gray-600">Uploading... {uploadProgress}%</p>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-indigo-600 h-2 rounded-full transition-all"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          {formData.photos.length >= 10 
+                            ? 'Maximum 10 photos uploaded'
+                            : 'Click to upload photos or drag and drop'
+                          }
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          PNG, JPG up to 5MB each • {formData.photos.length}/10 uploaded
+                        </p>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Photo Grid */}
+                  {formData.photos.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {formData.photos.map((photo, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={photo.url}
+                            alt={`Photo ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(index)}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                            Photo {index + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

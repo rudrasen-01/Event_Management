@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Star, MapPin, Verified, Phone, Mail, Globe, Calendar, 
+  Star, MapPin, Verified, Globe, Calendar, 
   Image as ImageIcon, Video, FileText, ChevronRight, Award,
   Heart, Share2, Send, Play, ExternalLink, Clock, AlertTriangle,
   X, Check, Building2, Users, TrendingUp, Shield
 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../services/api';
 import InquiryModal from '../components/InquiryModal';
+import ReviewModal from '../components/ReviewModal';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * VendorProfilePage - Professional Instagram + LinkedIn Style
@@ -17,6 +19,7 @@ import InquiryModal from '../components/InquiryModal';
 const VendorProfilePage = () => {
   const { vendorId } = useParams();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +27,8 @@ const VendorProfilePage = () => {
   const [activeTab, setActiveTab] = useState('gallery');
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [showInquiryModal, setShowInquiryModal] = useState(false);
-  const [showContactInfo, setShowContactInfo] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
 
   useEffect(() => {
     if (vendorId) {
@@ -36,16 +40,16 @@ const VendorProfilePage = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`/api/vendor-profile/${vendorId}`);
+      const response = await apiClient.get(`/vendor-profile/${vendorId}`);
       
-      if (response.data.success && response.data.data) {
-        setProfile(response.data.data);
+      if (response.success && response.data) {
+        setProfile(response.data);
       } else {
         setError('Vendor profile not found');
       }
     } catch (err) {
       console.error('Fetch profile error:', err);
-      setError(err.response?.data?.message || 'Failed to load vendor profile');
+      setError(err.message || 'Failed to load vendor profile');
     } finally {
       setLoading(false);
     }
@@ -65,6 +69,38 @@ const VendorProfilePage = () => {
     } else {
       navigator.clipboard.writeText(window.location.href);
       alert('Link copied to clipboard!');
+    }
+  };
+
+  const handleReviewClick = () => {
+    if (!isAuthenticated) {
+      // Redirect to login with return URL
+      navigate('/login', { state: { from: `/vendor/${vendorId}` } });
+      return;
+    }
+    setReviewSuccess(false);
+    setShowReviewModal(true);
+  };
+
+  const handleReviewSubmit = async (reviewData) => {
+    try {
+      const response = await apiClient.post(`/vendors/${vendorId}/reviews`, reviewData);
+      
+      if (response.success) {
+        setReviewSuccess(true);
+        // Optionally refresh vendor data to show updated review count
+        // fetchVendorProfile();
+        
+        // Show success message
+        setTimeout(() => {
+          setReviewSuccess(false);
+        }, 5000);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Review submission error:', error);
+      throw error;
     }
   };
 
@@ -97,12 +133,48 @@ const VendorProfilePage = () => {
     );
   }
 
-  const { vendor, media, blogs, videos, reviews, stats } = profile;
+  // Safely destructure profile data with defaults
+  const { 
+    vendor = {}, 
+    media = [], 
+    blogs = [], 
+    videos = [], 
+    reviews = [], 
+    stats = {} 
+  } = profile || {};
+
+  // Additional safety check for vendor data
+  if (!vendor || !vendor.businessName) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Profile</h2>
+          <p className="text-gray-600 mb-6">This vendor profile could not be loaded. Please try again later.</p>
+          <button
+            onClick={() => navigate('/search')}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            Browse Vendors
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Cover Image / Banner */}
-      <div className="h-48 md:h-64 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 relative overflow-hidden">
+      <div className="h-48 md:h-64 relative overflow-hidden">
+        {vendor.coverImage ? (
+          <img 
+            src={vendor.coverImage} 
+            alt="Cover" 
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500"></div>
+        )}
         <div className="absolute inset-0 bg-black/20"></div>
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cGF0aCBkPSJNLTEwIDMwaDYwdjJoLTYweiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjYSkiLz48L3N2Zz4=')] opacity-30"></div>
       </div>
@@ -113,9 +185,19 @@ const VendorProfilePage = () => {
           <div className="flex flex-col md:flex-row gap-6 md:gap-8">
             {/* Profile Picture / Logo */}
             <div className="flex-shrink-0 -mt-16 md:-mt-20">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-5xl md:text-6xl font-bold shadow-2xl border-4 border-white">
-                {vendor.businessName.charAt(0).toUpperCase()}
-              </div>
+              {vendor.profileImage ? (
+                <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl shadow-2xl border-4 border-white overflow-hidden">
+                  <img 
+                    src={vendor.profileImage} 
+                    alt={vendor.businessName} 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-5xl md:text-6xl font-bold shadow-2xl border-4 border-white">
+                  {vendor.businessName?.charAt(0).toUpperCase() || 'V'}
+                </div>
+              )}
             </div>
 
             {/* Vendor Info */}
@@ -124,7 +206,7 @@ const VendorProfilePage = () => {
                 <div>
                   <div className="flex items-center flex-wrap gap-2 mb-2">
                     <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-                      {vendor.businessName}
+                      {vendor.businessName || 'Vendor'}
                     </h1>
                     {vendor.verified && (
                       <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
@@ -140,13 +222,17 @@ const VendorProfilePage = () => {
                     )}
                   </div>
 
-                  <p className="text-lg text-gray-600 mb-3 capitalize">{vendor.serviceType.replace(/-/g, ' ')}</p>
+                  <p className="text-lg text-gray-600 mb-3 capitalize">
+                    {vendor.serviceType?.replace(/-/g, ' ') || 'Event Service'}
+                  </p>
 
                   {/* Location & Experience */}
                   <div className="flex flex-wrap gap-4 mb-3">
                     <div className="flex items-center gap-2 text-gray-600">
                       <MapPin className="w-5 h-5 text-indigo-600" />
-                      <span className="font-medium">{vendor.area ? `${vendor.area}, ${vendor.city}` : vendor.city}</span>
+                      <span className="font-medium">
+                        {vendor.area && vendor.city ? `${vendor.area}, ${vendor.city}` : vendor.city || 'Location Available'}
+                      </span>
                     </div>
                     {vendor.yearsInBusiness > 0 && (
                       <div className="flex items-center gap-2 text-gray-600">
@@ -231,56 +317,7 @@ const VendorProfilePage = () => {
                 >
                   <Share2 className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={() => setShowContactInfo(!showContactInfo)}
-                  className="px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
-                  title="Show Contact"
-                >
-                  <Phone className="w-5 h-5" />
-                </button>
               </div>
-              
-              {/* Contact Info (Toggle) */}
-              {showContactInfo && vendor.contact && (
-                <div className="mt-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Phone className="w-5 h-5 text-indigo-600" />
-                    Contact Information
-                  </h3>
-                  <div className="space-y-2">
-                    {vendor.contact.phone && (
-                      <div className="flex items-center gap-3">
-                        <Phone className="w-4 h-4 text-gray-600" />
-                        <a href={`tel:${vendor.contact.phone}`} className="text-indigo-600 hover:text-indigo-700 font-medium">
-                          {vendor.contact.phone}
-                        </a>
-                      </div>
-                    )}
-                    {vendor.contact.email && (
-                      <div className="flex items-center gap-3">
-                        <Mail className="w-4 h-4 text-gray-600" />
-                        <a href={`mailto:${vendor.contact.email}`} className="text-indigo-600 hover:text-indigo-700 font-medium">
-                          {vendor.contact.email}
-                        </a>
-                      </div>
-                    )}
-                    {vendor.contact.whatsapp && (
-                      <div className="flex items-center gap-3">
-                        <Phone className="w-4 h-4 text-gray-600" />
-                        <a 
-                          href={`https://wa.me/${vendor.contact.whatsapp.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-600 hover:text-green-700 font-medium flex items-center gap-2"
-                        >
-                          WhatsApp: {vendor.contact.whatsapp}
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -495,9 +532,18 @@ const VendorProfilePage = () => {
           <div>
             {reviews.length > 0 ? (
               <>
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Customer Reviews</h2>
-                  <p className="text-gray-600">See what our clients say about us</p>
+                <div className="mb-6 flex items-start justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Customer Reviews</h2>
+                    <p className="text-gray-600">See what our clients say about us</p>
+                  </div>
+                  <button
+                    onClick={handleReviewClick}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    <Star className="w-5 h-5" />
+                    Your Review
+                  </button>
                 </div>
                 <div className="space-y-4">
                   {reviews.map((review) => (
@@ -552,7 +598,14 @@ const VendorProfilePage = () => {
                     <Star className="w-12 h-12 text-gray-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">No Reviews Yet</h3>
-                  <p className="text-gray-600">Be the first to review this vendor!</p>
+                  <p className="text-gray-600 mb-6">Be the first to review this vendor!</p>
+                  <button
+                    onClick={handleReviewClick}
+                    className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    <Star className="w-5 h-5" />
+                    Write First Review
+                  </button>
                 </div>
               </div>
             )}
@@ -610,6 +663,41 @@ const VendorProfilePage = () => {
             pricing: vendor.pricing
           }}
         />
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <ReviewModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          vendor={{
+            _id: vendor.id,
+            businessName: vendor.businessName
+          }}
+          onSubmit={handleReviewSubmit}
+        />
+      )}
+
+      {/* Floating Review Button - Desktop & Tablet */}
+      <div className="hidden md:block fixed bottom-8 right-8 z-40">
+        <button
+          onClick={handleReviewClick}
+          className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-full shadow-2xl hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-105 hover:shadow-3xl"
+        >
+          <Star className="w-5 h-5" />
+          Your Review
+        </button>
+      </div>
+
+      {/* Review Success Notification */}
+      {reviewSuccess && (
+        <div className="fixed top-20 right-4 md:right-8 z-50 bg-green-500 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-slide-in-right">
+          <Check className="w-6 h-6" />
+          <div>
+            <p className="font-semibold">Review Submitted!</p>
+            <p className="text-sm opacity-90">Your review will be visible after admin approval.</p>
+          </div>
+        </div>
       )}
     </div>
   );

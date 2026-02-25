@@ -13,9 +13,15 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET || 'your-api-secret'
 });
 
+// Log configuration on startup (mask sensitive data)
+console.log('☁️  Cloudinary Configuration:');
+console.log('   Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME || 'NOT SET');
+console.log('   API Key:', process.env.CLOUDINARY_API_KEY ? process.env.CLOUDINARY_API_KEY.substring(0, 5) + '...' : 'NOT SET');
+console.log('   API Secret:', process.env.CLOUDINARY_API_SECRET ? '***SET***' : 'NOT SET');
+
 /**
  * Upload image to Cloudinary
- * @param {String} fileBuffer - File buffer or base64 string
+ * @param {Buffer|String} fileBuffer - File buffer or base64 string or file path
  * @param {Object} options - Upload options
  * @returns {Promise<Object>} Upload result with url and publicId
  */
@@ -32,7 +38,13 @@ const uploadImage = async (fileBuffer, options = {}) => {
       ...options
     };
 
-    const result = await cloudinary.uploader.upload(fileBuffer, defaultOptions);
+    // Convert Buffer to base64 data URI if it's a Buffer
+    let uploadData = fileBuffer;
+    if (Buffer.isBuffer(fileBuffer)) {
+      uploadData = `data:image/jpeg;base64,${fileBuffer.toString('base64')}`;
+    }
+
+    const result = await cloudinary.uploader.upload(uploadData, defaultOptions);
 
     return {
       url: result.secure_url,
@@ -50,7 +62,7 @@ const uploadImage = async (fileBuffer, options = {}) => {
 
 /**
  * Upload video to Cloudinary
- * @param {String} fileBuffer - File buffer or base64 string
+ * @param {Buffer|String} fileBuffer - File buffer or base64 string or file path
  * @param {Object} options - Upload options
  * @returns {Promise<Object>} Upload result with url and publicId
  */
@@ -67,7 +79,13 @@ const uploadVideo = async (fileBuffer, options = {}) => {
       ...options
     };
 
-    const result = await cloudinary.uploader.upload(fileBuffer, defaultOptions);
+    // Convert Buffer to base64 data URI if it's a Buffer
+    let uploadData = fileBuffer;
+    if (Buffer.isBuffer(fileBuffer)) {
+      uploadData = `data:video/mp4;base64,${fileBuffer.toString('base64')}`;
+    }
+
+    const result = await cloudinary.uploader.upload(uploadData, defaultOptions);
 
     return {
       url: result.secure_url,

@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const vendorBlogSchema = new mongoose.Schema({
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'VendorNew',
+    ref: 'Vendor',
     required: true,
     index: true
   },
@@ -47,6 +47,15 @@ const vendorBlogSchema = new mongoose.Schema({
     enum: ['draft', 'published', 'archived'],
     default: 'draft',
     index: true
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    index: true
+  },
+  rejectionReason: {
+    type: String
   },
   publishedAt: {
     type: Date
@@ -102,5 +111,6 @@ vendorBlogSchema.pre('save', function(next) {
 vendorBlogSchema.index({ vendorId: 1, status: 1, publishedAt: -1 });
 vendorBlogSchema.index({ tags: 1, status: 1 });
 vendorBlogSchema.index({ slug: 1 }, { unique: true, sparse: true });
+vendorBlogSchema.index({ approvalStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('VendorBlog', vendorBlogSchema);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Video, Upload, Trash2, Eye, EyeOff, PlayCircle, Clock, Film, AlertCircle } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../services/api';
 
 /**
  * VendorVideoManager Component
@@ -13,7 +13,9 @@ const VendorVideoManager = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
-  const [planLimits, setPlanLimits] = useState(null);
+  const [limits, setLimits] = useState(null);
+  const [planType, setPlanType] = useState('free');
+  const [currentUsage, setCurrentUsage] = useState({ videoCount: 0 });
 
   useEffect(() => {
     fetchVideos();
@@ -22,15 +24,13 @@ const VendorVideoManager = () => {
   const fetchVideos = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/vendor-profile/dashboard/me', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
-      });
+      const response = await apiClient.get('/vendor-profile/dashboard/me');
 
-      if (response.data.success) {
-        setVideos(response.data.data.videos || []);
-        setPlanLimits(response.data.data.planLimits);
+      if (response.success) {
+        setVideos(response.data.videos || []);
+        setLimits(response.data.limits);
+        setPlanType(response.data.planType || 'free');
+        setCurrentUsage(response.data.currentUsage || { videoCount: 0 });
       }
     } catch (error) {
       console.error('Fetch videos error:', error);
@@ -40,9 +40,32 @@ const VendorVideoManager = () => {
     }
   };
 
+  // Check if video uploads are allowed
+  const canUploadVideo = () => {
+    if (!limits) return false;
+    if (!limits.allowVideos) return false; // Free plan check
+    if (limits.videoLimit === -1) return true; // Unlimited
+    return currentUsage.videoCount < limits.videoLimit;
+  };
+
   const handleFileSelect = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Check if videos are allowed (Free plan restriction)
+    if (!limits?.allowVideos) {
+      setError(
+        '📹 Video uploads are not available in the Free Plan. ' +
+        'Upgrade to Starter Plan (₹499) or higher to upload videos.'
+      );
+      alert(
+        `🚨 Video Upload Not Available\n\n` +
+        `Video uploads are disabled in the Free Plan.\n\n` +
+        `⬆️ Upgrade to Starter Plan (₹499) to unlock video uploads!`
+      );
+      e.target.value = '';
+      return;
+    }
 
     // Validate file type
     const validTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm'];
@@ -59,8 +82,19 @@ const VendorVideoManager = () => {
     }
 
     // Check plan limits
-    if (planLimits && videos.length >= planLimits.maxVideos && planLimits.maxVideos !== -1) {
-      setError(`Your ${planLimits.planName} plan allows only ${planLimits.maxVideos} videos. Upgrade to upload more.`);
+    if (!canUploadVideo()) {
+      const suggestedPlan = planType === 'starter' ? 'Growth Plan (₹999)' : 'Premium Plan (₹1499)';
+      setError(
+        `Video limit reached (${currentUsage.videoCount}/${limits.videoLimit}). ` +
+        `Upgrade to ${suggestedPlan} for more videos.`
+      );
+      alert(
+        `🚨 Video Limit Reached!\n\n` +
+        `Your ${limits.planName} allows ${limits.videoLimit} videos.\n` +
+        `You have used all ${currentUsage.videoCount} slots.\n\n` +
+        `⬆️ Upgrade to ${suggestedPlan} for more storage!`
+      );
+      e.target.value = '';
       return;
     }
 
@@ -68,27 +102,70 @@ const VendorVideoManager = () => {
   };
 
   const uploadVideo = async (file) => {
-    const formData = new FormData();
-    formData.append('media', file);
-
     try {
       setUploading(true);
       setError(null);
       setUploadProgress(0);
 
-      const response = await axios.post('/api/vendor-profile/videos', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
-        }
+      // Step 1: Upload to Cloudinary directly from frontend
+      console.log('📤 Uploading video to Cloudinary...');
+      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dgeiwz7gm';
+      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'blog_uploads';
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', 'vendors/videos');
+      formData.append('resource_type', 'video');
+      
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`;
+      
+      // Upload with progress tracking
+      const xhr = new XMLHttpRequest();
+      
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentCompleted = Math.round((e.loaded * 100) / e.total);
+            setUploadProgress(percentCompleted);
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error('Upload failed'));
+          }
+        });
+        
+        xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+        
+        xhr.open('POST', cloudinaryUrl);
+        xhr.send(formData);
+      });
+      
+      const uploadData = await uploadPromise;
+      console.log('✅ Uploaded to Cloudinary:', uploadData.secure_url);
+      
+      // Step 2: Send URL to backend to save in database
+      const response = await apiClient.post('/vendor-profile/videos', {
+        url: uploadData.secure_url,
+        publicId: uploadData.public_id,
+        title: file.name.replace(/\.[^/.]+$/, ''), // Filename without extension
+        description: '',
+        thumbnail: uploadData.secure_url.replace(/\.(mp4|mov|avi|webm)$/, '.jpg'), // Cloudinary auto-generates thumbnails
+        duration: uploadData.duration || 0,
+        width: uploadData.width || 0,
+        height: uploadData.height || 0,
+        format: uploadData.format || 'video',
+        size: uploadData.bytes || 0
       });
 
-      if (response.data.success) {
-        setVideos([response.data.data, ...videos]);
+      if (response.success) {
+        // Refresh dashboard to get updated counts
+        await fetchVideos();
         setUploadProgress(100);
         setTimeout(() => {
           setUploadProgress(0);
@@ -96,7 +173,15 @@ const VendorVideoManager = () => {
       }
     } catch (error) {
       console.error('Upload error:', error);
-      setError(error.response?.data?.message || 'Failed to upload video');
+      
+      // Handle plan limit errors with upgrade prompts
+      if (error.response?.data?.upgradeRequired) {
+        setError(
+          `🚨 ${error.response.data.message} Upgrade to: ${error.response.data.suggestedPlan}`
+        );
+      } else {
+        setError(error.response?.data?.message || error.message || 'Failed to upload video');
+      }
     } finally {
       setUploading(false);
     }
@@ -104,19 +189,14 @@ const VendorVideoManager = () => {
 
   const toggleVisibility = async (videoId, currentVisibility) => {
     try {
-      const response = await axios.patch(
-        `/api/vendor-profile/videos/${videoId}/toggle-visibility`,
-        { visibility: currentVisibility === 'public' ? 'hidden' : 'public' },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-          }
-        }
+      const response = await apiClient.patch(
+        `/vendor-profile/videos/${videoId}/toggle-visibility`,
+        { visibility: currentVisibility === 'public' ? 'hidden' : 'public' }
       );
 
-      if (response.data.success) {
+      if (response.success) {
         setVideos(videos.map(v =>
-          v._id === videoId ? { ...v, visibility: response.data.data.visibility } : v
+          v._id === videoId ? { ...v, visibility: response.data.visibility } : v
         ));
       }
     } catch (error) {
@@ -131,13 +211,9 @@ const VendorVideoManager = () => {
     }
 
     try {
-      const response = await axios.delete(`/api/vendor-profile/videos/${videoId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('vendorToken')}`
-        }
-      });
+      const response = await apiClient.delete(`/vendor-profile/videos/${videoId}`);
 
-      if (response.data.success) {
+      if (response.success) {
         setVideos(videos.filter(v => v._id !== videoId));
       }
     } catch (error) {
@@ -167,37 +243,95 @@ const VendorVideoManager = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
+      {/* Free Plan Warning Banner */}
+      {limits && !limits.allowVideos && (
+        <div className="mb-6 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-bold text-gray-900 mb-2">
+                📹 Video Uploads Not Available in Free Plan
+              </h3>
+              <p className="text-sm text-gray-700 mb-3">
+                Video content is a premium feature. Upgrade your plan to start uploading videos and showcase your work more effectively.
+              </p>
+              <a 
+                href="#upgrade" 
+                className="inline-block px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all text-sm"
+              >
+                Upgrade to Starter Plan (₹499) →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Info Banner (for paid plans) */}
+      {limits && limits.allowVideos && (
+        <div className={`mb-6 p-4 rounded-lg border-2 ${
+          limits.videoLimit === -1 
+            ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
+            : canUploadVideo()
+            ? 'bg-blue-50 border-blue-200'
+            : 'bg-red-50 border-red-300'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-1">
+                {limits.planName} {limits.planPrice && `(${limits.planPrice})`}
+              </h3>
+              <p className="text-sm text-gray-700">
+                {limits.videoLimit === -1 ? (
+                  <span className="flex items-center gap-1">
+                    <Film className="w-4 h-4 text-purple-600" />
+                    <strong>Unlimited</strong> video uploads
+                  </span>
+                ) : (
+                  <span>
+                    <strong>{currentUsage.videoCount}</strong> of <strong>{limits.videoLimit}</strong> videos used
+                  </span>
+                )}
+              </p>
+            </div>
+            {!canUploadVideo() && (
+              <a 
+                href="#upgrade" 
+                className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all text-sm"
+              >
+                Upgrade Plan
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-1">Video Content</h2>
           <p className="text-sm text-gray-600">
-            Showcase your work with video content (Instagram Reels style)
+            {limits?.allowVideos 
+              ? 'Showcase your work with video content (Instagram Reels style)'
+              : 'Upgrade to unlock video uploads'
+            }
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          {planLimits && (
-            <div className="text-sm text-gray-600">
-              <span className="font-semibold">{videos.length}</span> / {planLimits.maxVideos === -1 ? '∞' : planLimits.maxVideos} videos
-            </div>
-          )}
-          <label
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all cursor-pointer ${
-              uploading || (planLimits && videos.length >= planLimits.maxVideos && planLimits.maxVideos !== -1)
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-purple-600 text-white hover:bg-purple-700 shadow-md hover:shadow-lg'
-            }`}
-          >
-            <Upload className="w-5 h-5" />
-            {uploading ? 'Uploading...' : 'Upload Video'}
-            <input
-              type="file"
-              accept="video/mp4,video/mov,video/avi,video/webm"
-              onChange={handleFileSelect}
-              disabled={uploading || (planLimits && videos.length >= planLimits.maxVideos && planLimits.maxVideos !== -1)}
-              className="hidden"
-            />
-          </label>
-        </div>
+        <label
+          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+            canUploadVideo() && !uploading
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-md hover:shadow-lg cursor-pointer'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          <Upload className="w-5 h-5" />
+          {uploading ? 'Uploading...' : !limits?.allowVideos ? 'Videos Locked' : !canUploadVideo() ? 'Limit Reached' : 'Upload Video'}
+          <input
+            type="file"
+            accept="video/mp4,video/mov,video/avi,video/webm"
+            onChange={handleFileSelect}
+            disabled={uploading || !canUploadVideo()}
+            className="hidden"
+          />
+        </label>
       </div>
 
       {/* Upload Progress */}
@@ -358,11 +492,11 @@ const VendorVideoManager = () => {
       )}
 
       {/* Plan Upgrade Hint */}
-      {planLimits && videos.length >= planLimits.maxVideos && planLimits.maxVideos !== -1 && (
+      {limits && videos.length >= limits.videoLimit && limits.videoLimit !== -1 && (
         <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <h4 className="font-semibold text-yellow-900 mb-1">Video Limit Reached</h4>
           <p className="text-sm text-yellow-800">
-            You've reached your plan limit of {planLimits.maxVideos} videos. 
+            You've reached your plan limit of {limits.videoLimit} videos. 
             <a href="/vendor/plans" className="font-semibold underline ml-1">Upgrade your plan</a> to upload more videos.
           </p>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Filter, MapPin, Grid, List, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { Search, Filter, MapPin, Grid, List, SlidersHorizontal, ArrowUpDown, Star } from 'lucide-react';
 import VendorCard from '../components/VendorCard';
 import SolutionCard from '../components/SolutionCard';
 import FilterPanel from '../components/FilterPanel';
@@ -18,8 +18,10 @@ const SearchResults = () => {
   const [totalVendors, setTotalVendors] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
-  const [viewTab, setViewTab] = useState('solutions'); // 'solutions' or 'vendors'
+  const [viewTab, setViewTab] = useState('vendors'); // 'solutions' or 'vendors'
   const [sortBy, setSortBy] = useState('relevance'); // 'relevance', 'distance', 'budget', 'rating'
+  const [tierBreakdown, setTierBreakdown] = useState(null);
+  const [searchMetadata, setSearchMetadata] = useState(null);
 
   // Search filters from URL params (updated for new funnel)
   const [filters, setFilters] = useState({
@@ -105,9 +107,18 @@ const SearchResults = () => {
       // Use only database-driven results - no mock data fallback
       const vendorsList = response.vendors || [];
       
+      // Debug: Check if vendors have matchTier
+      console.log('📊 Vendors received from API:', vendorsList.length);
+      console.log('First vendor matchTier:', vendorsList[0]?.matchTier);
+      console.log('Tier breakdown:', response.tierBreakdown);
+      
       setVendors(vendorsList);
       setTotalVendors(response.total || vendorsList.length);
       setSolutions(buildSolutionsFromVendors(vendorsList));
+      
+      // Store tier breakdown and metadata for beautiful sections
+      setTierBreakdown(response.tierBreakdown || null);
+      setSearchMetadata(response.metadata || null);
       
     } catch (error) {
       console.error('❌ Error loading vendors:', error);
@@ -181,6 +192,158 @@ const SearchResults = () => {
     }
     
     return parts.join(' ') || 'All Events';
+  };
+
+  // Group vendors by tier - Strict Priority Order
+  const groupVendorsByTier = () => {
+    // If no vendors, return empty array
+    if (!vendors || vendors.length === 0) {
+      return [];
+    }
+
+    const groups = {
+      exact_area: { 
+        vendors: [], 
+        title: 'Same Area Vendors', 
+        subtitle: 'In Your Area',
+        icon: '👑', 
+        color: 'indigo', 
+        description: `Located exactly in ${filters.area || detailedLocation.area || 'your selected area'} and highly rated`,
+        priority: 1
+      },
+      nearby: { 
+        vendors: [], 
+        title: 'Nearby Vendors', 
+        subtitle: 'Nearby',
+        icon: '🔵', 
+        color: 'blue', 
+        description: `Vendors near ${filters.area || detailedLocation.area || filters.city || detailedLocation.city || 'your location'}`,
+        priority: 2
+      },
+      same_city: { 
+        vendors: [], 
+        title: 'Same City – Other Areas', 
+        subtitle: filters.city || detailedLocation.city || 'Same City',
+        icon: '🔵', 
+        color: 'purple', 
+        description: `Other vendors in ${filters.city || detailedLocation.city || 'the same city'}`,
+        priority: 3
+      },
+      adjacent_city: { 
+        vendors: [], 
+        title: 'Nearby Cities Vendors', 
+        subtitle: 'Nearby Cities',
+        icon: '🔵', 
+        color: 'green', 
+        description: 'Vendors from nearby cities within practical distance',
+        priority: 4
+      },
+      all: {
+        vendors: [],
+        title: 'All Vendors',
+        subtitle: 'Available Vendors',
+        icon: '🔵',
+        color: 'indigo',
+        description: 'Browse all available vendors for your event',
+        priority: 5
+      }
+    };
+
+    vendors.forEach(vendor => {
+      const tier = vendor.matchTier || 'all'; // Default to 'all' if no tier
+      if (groups[tier]) {
+        groups[tier].vendors.push(vendor);
+      } else {
+        // Fallback to 'all' group if tier doesn't exist
+        groups.all.vendors.push(vendor);
+      }
+    });
+
+    console.log('🔍 Grouped vendors by tier:', {
+      exact_area: groups.exact_area.vendors.length,
+      nearby: groups.nearby.vendors.length,
+      same_city: groups.same_city.vendors.length,
+      adjacent_city: groups.adjacent_city.vendors.length,
+      all: groups.all.vendors.length
+    });
+
+    // Filter out empty groups and return in strict priority order
+    const result = Object.entries(groups)
+      .filter(([_, group]) => group.vendors.length > 0)
+      .sort((a, b) => a[1].priority - b[1].priority)
+      .map(([tier, group]) => ({ tier, ...group }));
+      
+    console.log('📦 Final grouped sections:', result.length, result.map(r => ({ title: r.title, count: r.vendors.length })));
+    
+    return result;
+  };
+
+  // Section Header Component - Exact Reference Image Style
+  const SectionHeader = ({ title, subtitle, icon, color, description, count, priority }) => {
+    // Emoji icons for each priority level
+    const emojiIcons = {
+      1: '👑',  // Crown for top vendors
+      2: '🔵',  // Blue circle for nearby
+      3: '🔵',  // Blue circle for more in city
+      4: '🔵'   // Blue circle for nearby cities
+    };
+
+    const displayIcon = icon || emojiIcons[priority] || '🔵';
+
+    // Distance filter options for "More Vendors" and "Nearby Cities" sections
+    const showDistanceFilters = priority === 3 || priority === 4;
+    const distanceOptions = ['5 km', '10 km', '25 km', '50 km'];
+
+    return (
+      <div className="mb-6">
+        {/* Main Header Row */}
+        <div className="flex items-center justify-between gap-4 mb-3">
+          {/* Left: Icon + Title + Badge */}
+          <div className="flex items-center gap-3">
+            {/* Circular Icon Background */}
+            <div className={`
+              w-10 h-10 rounded-full flex items-center justify-center text-xl
+              ${priority === 1 ? 'bg-purple-100' : 'bg-blue-100'}
+            `}>
+              {displayIcon}
+            </div>
+            
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+                
+                {/* Top Rated Badge */}
+                {priority === 1 && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">
+                    <span>⚡</span>
+                    <span>Top Rated</span>
+                  </span>
+                )}
+              </div>
+              
+              {/* Subtitle/Description */}
+              <p className="text-sm text-gray-600 mt-0.5">
+                {description}
+              </p>
+            </div>
+          </div>
+
+          {/* Right: Distance Filter Buttons */}
+          {showDistanceFilters && (
+            <div className="flex items-center gap-2">
+              {distanceOptions.map((distance) => (
+                <button
+                  key={distance}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors"
+                >
+                  {distance}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -336,18 +499,42 @@ const SearchResults = () => {
                 </div>
               )
             ) : vendors.length > 0 ? (
-              <div className={`grid gap-6 ${
-                viewMode === 'grid' 
-                  ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' 
-                  : 'grid-cols-1'
-              }`}>
-                {vendors.map((vendor) => (
-                  <VendorCard
-                    key={vendor._id}
-                    vendor={vendor}
-                    variant={viewMode === 'list' ? 'compact' : 'default'}
-                    showDistance={true}
-                  />
+              /* Tier-based Results Display - Reference Image Style */
+              <div className="space-y-10">
+                {groupVendorsByTier().map((group, index) => (
+                  <div 
+                    key={group.tier} 
+                    className={`
+                      ${index > 0 ? 'pt-6' : ''}
+                    `}
+                  >
+                    <SectionHeader 
+                      title={group.title}
+                      subtitle={group.subtitle}
+                      icon={group.icon}
+                      color={group.color}
+                      description={group.description}
+                      count={group.vendors.length}
+                      priority={group.priority}
+                    />
+                    
+                    {/* Vendor Grid */}
+                    <div className={`grid gap-6 ${
+                      viewMode === 'grid' 
+                        ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' 
+                        : 'grid-cols-1'
+                    }`}>
+                      {group.vendors.map((vendor) => (
+                        <VendorCard
+                          key={vendor._id}
+                          vendor={vendor}
+                          variant={viewMode === 'list' ? 'compact' : 'default'}
+                          showDistance={true}
+                          sectionLabel={group.subtitle}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (

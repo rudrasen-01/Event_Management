@@ -27,12 +27,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Users, Mail, TrendingUp, Calendar, CheckCircle, XCircle,
   UserCheck, UserX, Filter, Search, Eye, Edit, Trash2,
   Plus, RefreshCw, MapPin, DollarSign, Phone, Award,
   AlertCircle, BarChart3, PieChart, Shield, EyeOff,
-  Clock, Ban, X, Check, Building2
+  Clock, Ban, X, Check, Building2, FileText, Upload, Image, Star
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -52,10 +54,40 @@ import {
   rejectInquiry,
   fetchInquiryApprovalStats,
   forwardInquiry,
-  toggleInquiryActive
+  toggleInquiryActive,
+  fetchAllReviewsAdmin,
+  fetchReviewStats,
+  fetchPendingReviews,
+  approveReviewAdmin,
+  rejectReviewAdmin,
+  deleteReviewAdmin,
+  fetchAllMediaAdmin,
+  fetchMediaStats,
+  fetchPendingMedia,
+  approveMediaAdmin,
+  rejectMediaAdmin,
+  deleteMediaAdmin,
+  fetchAllBlogsAdmin as fetchAllVendorBlogsAdmin,
+  fetchBlogStats,
+  fetchPendingBlogs,
+  approveBlogAdmin,
+  rejectBlogAdmin,
+  deleteBlogAdmin
 } from '../services/api';
+import {
+  fetchAllBlogsAdmin,
+  createBlog,
+  updateBlog,
+  deleteBlog,
+  toggleBlogPublish,
+  getBlogStats,
+  uploadBlogImage
+} from '../services/blogService';
 
 const AdminPanel = () => {
+  const navigate = useNavigate();
+  const { user, isAdmin, logout, loading: authLoading } = useAuth();
+
   // State Management
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
@@ -66,14 +98,29 @@ const AdminPanel = () => {
   const [vendors, setVendors] = useState([]);
   const [users, setUsers] = useState([]);
   const [inquiries, setInquiries] = useState([]);
+  const [blogs, setBlogs] = useState([]);
+  const [blogStats, setBlogStats] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewStats, setReviewStats] = useState(null);
+  const [reviewFilter, setReviewFilter] = useState('all'); // all, pending, approved, rejected
+  const [media, setMedia] = useState([]);
+  const [mediaStats, setMediaStats] = useState(null);
+  const [mediaFilter, setMediaFilter] = useState('all'); // all, pending, approved, rejected
+  const [vendorBlogs, setVendorBlogs] = useState([]);
+  const [vendorBlogStats, setVendorBlogStats] = useState(null);
+  const [vendorBlogFilter, setVendorBlogFilter] = useState('all'); // all, pending, approved, rejected
   
   // UI States
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [inquiryFilter, setInquiryFilter] = useState('all'); // all, vendor, contact
   const [approvalFilter, setApprovalFilter] = useState('all'); // all, pending, approved, rejected
+  const [blogStatusFilter, setBlogStatusFilter] = useState('all'); // all, published, draft
   const [notification, setNotification] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showBlogModal, setShowBlogModal] = useState(false);
+  const [editingBlog, setEditingBlog] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   // Dialog States
   const [confirmDialog, setConfirmDialog] = useState({
@@ -85,104 +132,502 @@ const AdminPanel = () => {
     requireInput: false
   });
 
-  // Load Data on Mount & Auto-refresh
-  useEffect(() => {
-    loadDashboardData();
-    
-    const interval = setInterval(() => {
-      loadDashboardData();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'vendors') loadVendors();
-    else if (activeTab === 'users') loadUsers();
-    else if (activeTab === 'inquiries') loadInquiries();
-  }, [activeTab]);
-
-  // Data Loading Functions
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      const [statsData, activityData] = await Promise.all([
-        fetchAdminStats(),
-        fetchRecentActivity(10)
-      ]);
-      setStats(statsData?.data || statsData);
-      setRecentActivity(activityData?.data || activityData);
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-      showNotification('error', 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadVendors = async () => {
-    setLoading(true);
-    try {
-      const response = await fetchAllVendorsAdmin({ page: 1, limit: 100 });
-      
-      // Response structure: { success: true, data: { vendors: [], total, page, totalPages } }
-      const vendorsList = response?.data?.vendors || [];
-      
-      setVendors(vendorsList);
-      
-      if (vendorsList.length === 0) {
-        showNotification('info', 'No vendors found in database');
-      } else {
-        showNotification('success', `Loaded ${vendorsList.length} vendors`);
-      }
-    } catch (error) {
-      console.error('❌ Error loading vendors:', error);
-      showNotification('error', 'Failed to load vendors: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchAllUsers({ page: 1, limit: 100 });
-      setUsers(data?.users || []);
-    } catch (error) {
-      console.error('Error loading users:', error);
-      showNotification('error', 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadInquiries = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchAllInquiriesAdmin({ page: 1, limit: 200 });
-      // Backend returns: { inquiries: [...], total, page, totalPages }
-      const inquiriesList = data?.inquiries || [];
-      setInquiries(inquiriesList);
-    } catch (error) {
-      console.error('Error loading inquiries:', error);
-      showNotification('error', 'Failed to load inquiries');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Notification Helper
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // Verify admin access
+  useEffect(() => {
+    console.log('🔐 Admin Panel - Verifying access...');
+    console.log('User:', user);
+    console.log('Is Admin:', isAdmin());
+    
+    // Check localStorage token
+    const storedToken = localStorage.getItem('authToken');
+    const storedUser = localStorage.getItem('authUser');
+    console.log('📦 LocalStorage check:', {
+      hasToken: !!storedToken,
+      hasUser: !!storedUser,
+      tokenPreview: storedToken ? storedToken.substring(0, 30) + '...' : 'none'
+    });
+    
+    if (!user || !isAdmin()) {
+      console.error('❌ Access denied - not an admin');
+      showNotification('error', 'Access denied. Admin privileges required.');
+      setTimeout(() => {
+        logout();
+        navigate('/');
+      }, 2000);
+      return;
+    }
+    
+    console.log('✅ Admin access verified for:', user.email);
+  }, [user, isAdmin]);
+
+  // Load Data on Mount & Auto-refresh
+  useEffect(() => {
+    // Wait for auth to finish loading before making API calls
+    if (authLoading) {
+      console.log('⏳ Waiting for auth to load...');
+      return;
+    }
+    
+    // Only load data if user is admin
+    if (user && isAdmin()) {
+      console.log('📊 Initial data load (auth ready)...');
+      loadDashboardData();
+      
+      // Auto-refresh every 30 seconds
+      const interval = setInterval(() => {
+        if (user && isAdmin()) {
+          console.log('🔄 Auto-refreshing dashboard...');
+          loadDashboardData();
+        }
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [user, isAdmin, authLoading]);
+
+  useEffect(() => {
+    // Wait for auth to finish loading before making API calls
+    if (authLoading) return;
+    
+    if (user && isAdmin()) {
+      if (activeTab === 'vendors') loadVendors();
+      else if (activeTab === 'users') loadUsers();
+      else if (activeTab === 'inquiries') loadInquiries();
+      else if (activeTab === 'blogs') loadBlogs();
+      else if (activeTab === 'reviews') loadReviews();
+      else if (activeTab === 'media') loadMedia();
+      else if (activeTab === 'vendor-blogs') loadVendorBlogs();
+    }
+  }, [activeTab, user, isAdmin, authLoading]);
+
+  // Data Loading Functions
+  const loadDashboardData = async (showSuccessNotification = false) => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading dashboard data...');
+      const [statsData, activityData] = await Promise.all([
+        fetchAdminStats(),
+        fetchRecentActivity(10)
+      ]);
+      console.log('✅ Stats data received:', statsData);
+      console.log('✅ Activity data received:', activityData);
+      
+      // Data is already extracted from response.data in API service
+      setStats(statsData || {});
+      setRecentActivity(activityData || {});
+      
+      if (showSuccessNotification) {
+        showNotification('success', 'Dashboard data loaded successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error loading dashboard:', error);
+      showNotification('error', 'Failed to load dashboard data: ' + error.message);
+      // Set empty defaults to prevent UI crashes
+      setStats({});
+      setRecentActivity({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadVendors = async (showSuccessNotification = false) => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading vendors...');
+      const response = await fetchAllVendorsAdmin({ page: 1, limit: 100 });
+      console.log('✅ Vendors data received:', response);
+      
+      // Response is already extracted: { vendors: [], total, page, totalPages }
+      const vendorsList = response?.vendors || [];
+      
+      setVendors(vendorsList);
+      
+      if (showSuccessNotification) {
+        if (vendorsList.length === 0) {
+          showNotification('info', 'No vendors found in database');
+        } else {
+          showNotification('success', `Loaded ${vendorsList.length} vendors successfully`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading vendors:', error);
+      showNotification('error', 'Failed to load vendors: ' + error.message);
+      setVendors([]); // Set empty array to prevent UI crashes
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadUsers = async (showSuccessNotification = false) => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading users...');
+      const data = await fetchAllUsers({ page: 1, limit: 100 });
+      console.log('✅ Users data received:', data);
+      
+      // Data is already extracted: { users: [], total, page, totalPages }
+      const usersList = data?.users || [];
+      setUsers(usersList);
+      
+      if (showSuccessNotification) {
+        showNotification('success', `Loaded ${usersList.length} users successfully`);
+      }
+    } catch (error) {
+      console.error('❌ Error loading users:', error);
+      showNotification('error', 'Failed to load users: ' + error.message);
+      setUsers([]); // Set empty array to prevent UI crashes
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadInquiries = async (showSuccessNotification = false) => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading inquiries...');
+      const data = await fetchAllInquiriesAdmin({ page: 1, limit: 200 });
+      console.log('✅ Inquiries data received:', data);
+      
+      // Data is already extracted: { inquiries: [...], total, page, totalPages }
+      const inquiriesList = data?.inquiries || [];
+      setInquiries(inquiriesList);
+      
+      if (showSuccessNotification) {
+        showNotification('success', `Loaded ${inquiriesList.length} inquiries successfully`);
+      }
+    } catch (error) {
+      console.error('❌ Error loading inquiries:', error);
+      showNotification('error', 'Failed to load inquiries: ' + error.message);
+      setInquiries([]); // Set empty array to prevent UI crashes
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBlogs = async (showSuccessNotification = false) => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading blogs...');
+      const [blogsData, statsData] = await Promise.all([
+        fetchAllBlogsAdmin({ page: 1, limit: 100 }),
+        getBlogStats()
+      ]);
+      console.log('✅ Blogs data received:', blogsData);
+      console.log('✅ Blog stats received:', statsData);
+      
+      // Backend returns { success: true, data: [...blogs], pagination: {...} }
+      // apiClient returns response.data, so blogsData.data is the blogs array
+      const blogsList = blogsData?.data || [];
+      setBlogs(blogsList);
+      
+      console.log('📊 Loaded blogs count:', blogsList.length);
+      console.log('📋 Blogs list:', blogsList);
+      
+      // Extract stats from response
+      const stats = statsData?.data || statsData || {};
+      setBlogStats(stats);
+      
+      if (showSuccessNotification) {
+        if (blogsList.length === 0) {
+          showNotification('info', 'No blogs found. Create your first blog post!');
+        } else {
+          showNotification('success', `Loaded ${blogsList.length} blogs successfully`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading blogs:', error);
+      showNotification('error', 'Failed to load blogs: ' + error.message);
+      setBlogs([]); // Set empty array to prevent UI crashes
+      setBlogStats({}); // Set empty object to prevent UI crashes
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load Reviews
+  const loadReviews = async (showSuccessNotification = false) => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading reviews...');
+      
+      // Fetch reviews and stats in parallel
+      const [reviewsData, statsData] = await Promise.all([
+        fetchAllReviewsAdmin({ 
+          status: reviewFilter,
+          page: 1, 
+          limit: 100 
+        }),
+        fetchReviewStats()
+      ]);
+      
+      console.log('✅ Reviews data received:', reviewsData);
+      console.log('✅ Review stats received:', statsData);
+      
+      const reviewsList = reviewsData?.data?.reviews || [];
+      setReviews(reviewsList);
+      
+      const stats = statsData?.data || {};
+      setReviewStats(stats);
+      
+      console.log('📊 Loaded reviews count:', reviewsList.length);
+      
+      if (showSuccessNotification) {
+        if (reviewsList.length === 0) {
+          showNotification('info', 'No reviews found');
+        } else {
+          showNotification('success', `Loaded ${reviewsList.length} reviews successfully`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading reviews:', error);
+      showNotification('error', 'Failed to load reviews: ' + error.message);
+      setReviews([]);
+      setReviewStats({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Approve Review
+  const handleApproveReview = async (reviewId) => {
+    try {
+      await approveReviewAdmin(reviewId);
+      showNotification('success', 'Review approved successfully');
+      loadReviews();
+    } catch (error) {
+      console.error('Error approving review:', error);
+      showNotification('error', 'Failed to approve review: ' + error.message);
+    }
+  };
+
+  // Reject Review
+  const handleRejectReview = async (reviewId, reason) => {
+    try {
+      await rejectReviewAdmin(reviewId, reason);
+      showNotification('success', 'Review rejected successfully');
+      loadReviews();
+    } catch (error) {
+      console.error('Error rejecting review:', error);
+      showNotification('error', 'Failed to reject review: ' + error.message);
+    }
+  };
+
+  // Delete Review
+  const handleDeleteReview = async (reviewId) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Review',
+      message: 'Are you sure you want to permanently delete this review? This action cannot be undone.',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteReviewAdmin(reviewId);
+          showNotification('success', 'Review deleted successfully');
+          loadReviews();
+        } catch (error) {
+          console.error('Error deleting review:', error);
+          showNotification('error', 'Failed to delete review: ' + error.message);
+        }
+      }
+    });
+  };
+
+  // ========== MEDIA MANAGEMENT ==========
+
+  // Load Media
+  const loadMedia = async (showSuccessNotification = false) => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading media...');
+
+      // Fetch media and stats in parallel
+      const [mediaData, statsData] = await Promise.all([
+        fetchAllMediaAdmin({ 
+          approvalStatus: mediaFilter === 'all' ? undefined : mediaFilter,
+          page: 1, 
+          limit: 100 
+        }),
+        fetchMediaStats()
+      ]);
+      
+      console.log('✅ Media data received:', mediaData);
+      console.log('✅ Media stats received:', statsData);
+      
+      const mediaList = mediaData?.data?.media || [];
+      setMedia(mediaList);
+      
+      const stats = statsData?.data || {};
+      setMediaStats(stats);
+      
+      console.log('📊 Loaded media count:', mediaList.length);
+      
+      if (showSuccessNotification) {
+        if (mediaList.length === 0) {
+          showNotification('info', 'No media found');
+        } else {
+          showNotification('success', `Loaded ${mediaList.length} media items successfully`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading media:', error);
+      showNotification('error', 'Failed to load media: ' + error.message);
+      setMedia([]);
+      setMediaStats({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Approve Media
+  const handleApproveMedia = async (mediaId) => {
+    try {
+      await approveMediaAdmin(mediaId);
+      showNotification('success', 'Media approved successfully');
+      loadMedia();
+    } catch (error) {
+      console.error('Error approving media:', error);
+      showNotification('error', 'Failed to approve media: ' + error.message);
+    }
+  };
+
+  // Reject Media
+  const handleRejectMedia = async (mediaId, reason) => {
+    try {
+      await rejectMediaAdmin(mediaId, reason);
+      showNotification('success', 'Media rejected successfully');
+      loadMedia();
+    } catch (error) {
+      console.error('Error rejecting media:', error);
+      showNotification('error', 'Failed to reject media: ' + error.message);
+    }
+  };
+
+  // Delete Media
+  const handleDeleteMedia = async (mediaId) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Media',
+      message: 'Are you sure you want to permanently delete this media? This action cannot be undone.',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteMediaAdmin(mediaId);
+          showNotification('success', 'Media deleted successfully');
+          loadMedia();
+        } catch (error) {
+          console.error('Error deleting media:', error);
+          showNotification('error', 'Failed to delete media: ' + error.message);
+        }
+      }
+    });
+  };
+
+  // ========== VENDOR BLOG MANAGEMENT ==========
+
+  // Load Vendor Blogs
+  const loadVendorBlogs = async (showSuccessNotification = false) => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading vendor blogs...');
+
+      // Fetch blogs and stats in parallel
+      const [blogsData, statsData] = await Promise.all([
+        fetchAllVendorBlogsAdmin({ 
+          approvalStatus: vendorBlogFilter === 'all' ? undefined : vendorBlogFilter,
+          page: 1, 
+          limit: 100 
+        }),
+        fetchBlogStats()
+      ]);
+      
+      console.log('✅ Vendor blogs data received:', blogsData);
+      console.log('✅ Vendor blog stats received:', statsData);
+      
+      const blogList = blogsData?.data?.blogs || [];
+      setVendorBlogs(blogList);
+      
+      const stats = statsData?.data || {};
+      setVendorBlogStats(stats);
+      
+      console.log('📊 Loaded vendor blogs count:', blogList.length);
+      
+      if (showSuccessNotification) {
+        if (blogList.length === 0) {
+          showNotification('info', 'No vendor blogs found');
+        } else {
+          showNotification('success', `Loaded ${blogList.length} vendor blogs successfully`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading vendor blogs:', error);
+      showNotification('error', 'Failed to load vendor blogs: ' + error.message);
+      setVendorBlogs([]);
+      setVendorBlogStats({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Approve Vendor Blog
+  const handleApproveVendorBlog = async (blogId) => {
+    try {
+      await approveBlogAdmin(blogId);
+      showNotification('success', 'Blog approved successfully');
+      loadVendorBlogs();
+    } catch (error) {
+      console.error('Error approving blog:', error);
+      showNotification('error', 'Failed to approve blog: ' + error.message);
+    }
+  };
+
+  // Reject Vendor Blog
+  const handleRejectVendorBlog = async (blogId, reason) => {
+    try {
+      await rejectBlogAdmin(blogId, reason);
+      showNotification('success', 'Blog rejected successfully');
+      loadVendorBlogs();
+    } catch (error) {
+      console.error('Error rejecting blog:', error);
+      showNotification('error', 'Failed to reject blog: ' + error.message);
+    }
+  };
+
+  // Delete Vendor Blog
+  const handleDeleteVendorBlog = async (blogId) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Blog',
+      message: 'Are you sure you want to permanently delete this blog? This action cannot be undone.',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteBlogAdmin(blogId);
+          showNotification('success', 'Blog deleted successfully');
+          loadVendorBlogs();
+        } catch (error) {
+          console.error('Error deleting blog:', error);
+          showNotification('error', 'Failed to delete blog: ' + error.message);
+        }
+      }
+    });
+  };
+
   // Refresh Current View
   const handleRefresh = () => {
-    if (activeTab === 'overview') loadDashboardData();
-    else if (activeTab === 'vendors') loadVendors();
-    else if (activeTab === 'users') loadUsers();
-    else if (activeTab === 'inquiries') loadInquiries();
+    if (activeTab === 'overview') loadDashboardData(true);
+    else if (activeTab === 'vendors') loadVendors(true);
+    else if (activeTab === 'users') loadUsers(true);
+    else if (activeTab === 'inquiries') loadInquiries(true);
+    else if (activeTab === 'blogs') loadBlogs(true);
+    else if (activeTab === 'reviews') loadReviews(true);
+    else if (activeTab === 'media') loadMedia(true);
+    else if (activeTab === 'vendor-blogs') loadVendorBlogs(true);
   };
 
   // ========== INQUIRY ACTIONS ==========
@@ -450,6 +895,78 @@ const AdminPanel = () => {
         }
       }
     });
+  };
+
+  // ========== BLOG ACTIONS ==========
+
+  const handleCreateBlog = () => {
+    setEditingBlog(null);
+    setShowBlogModal(true);
+  };
+
+  const handleEditBlog = (blog) => {
+    setEditingBlog(blog);
+    setShowBlogModal(true);
+  };
+
+  const handleSaveBlog = async (blogData) => {
+    try {
+      if (editingBlog) {
+        await updateBlog(editingBlog._id, blogData);
+        showNotification('success', 'Blog updated successfully');
+      } else {
+        await createBlog(blogData);
+        showNotification('success', 'Blog created successfully');
+      }
+      setShowBlogModal(false);
+      setEditingBlog(null);
+      loadBlogs();
+    } catch (error) {
+      showNotification('error', `Failed to save blog: ${error.message}`);
+    }
+  };
+
+  const handleDeleteBlog = (blog) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: '⚠️ Delete Blog',
+      message: `Are you sure you want to delete "${blog.title}"? This action cannot be undone.`,
+      type: 'danger',
+      requireInput: false,
+      onConfirm: async () => {
+        try {
+          await deleteBlog(blog._id);
+          showNotification('success', 'Blog deleted successfully');
+          loadBlogs();
+        } catch (error) {
+          showNotification('error', `Failed to delete blog: ${error.message}`);
+        }
+      }
+    });
+  };
+
+  const handleToggleBlogStatus = async (blog) => {
+    try {
+      await toggleBlogPublish(blog._id);
+      showNotification('success', `Blog ${blog.status === 'published' ? 'unpublished' : 'published'} successfully`);
+      loadBlogs();
+    } catch (error) {
+      showNotification('error', `Failed to update blog status: ${error.message}`);
+    }
+  };
+
+  const handleImageUpload = async (file) => {
+    try {
+      setUploadingImage(true);
+      const result = await uploadBlogImage(file);
+      // result is {url, publicId}
+      return result;
+    } catch (error) {
+      showNotification('error', 'Failed to upload image');
+      throw error;
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   // Render Functions
@@ -1241,15 +1758,653 @@ const AdminPanel = () => {
     );
   };
 
+  const renderBlogs = () => {
+    const filteredBlogs = blogs.filter(blog => {
+      const matchesSearch = searchTerm === '' || 
+        blog.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        blog.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        blog.category?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = blogStatusFilter === 'all' || 
+        blog.status === blogStatusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header with Stats */}
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">📝 Blog Management</h2>
+              <p className="text-white text-opacity-90">Create and manage your content</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{blogStats?.totalBlogs || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Total</p>
+              </div>
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{blogStats?.publishedBlogs || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Published</p>
+              </div>
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{blogStats?.draftBlogs || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Drafts</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions and Filters */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Filter className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-semibold text-gray-900">Search & Filter</h3>
+            </div>
+            <button
+              onClick={handleCreateBlog}
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              <Plus className="w-5 h-5" />
+              Create New Blog
+            </button>
+          </div>
+          
+          <div className="flex flex-wrap gap-4 mt-4">
+            <div className="flex-1 min-w-[250px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search blogs by title, excerpt, or category..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                />
+              </div>
+            </div>
+            <select
+              value={blogStatusFilter}
+              onChange={(e) => setBlogStatusFilter(e.target.value)}
+              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
+            >
+              <option value="all">🔄 All Status</option>
+              <option value="published">✅ Published</option>
+              <option value="draft">📝 Draft</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Blogs Table */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-indigo-50 to-purple-50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Title</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Views</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Published</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredBlogs.length > 0 ? (
+                  filteredBlogs.map((blog) => (
+                    <tr key={blog._id} className="hover:bg-indigo-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-start gap-3">
+                          {blog.featuredImage && (
+                            <img 
+                              src={blog.featuredImage} 
+                              alt={blog.title}
+                              className="w-16 h-16 object-cover rounded-lg"
+                            />
+                          )}
+                          <div>
+                            <p className="font-bold text-gray-900">{blog.title}</p>
+                            <p className="text-sm text-gray-600 line-clamp-2 mt-1">{blog.excerpt}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                          {blog.category || 'Uncategorized'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                          blog.status === 'published' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {blog.status === 'published' ? '✅ Published' : '📝 Draft'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Eye className="w-4 h-4 text-gray-500" />
+                          <span className="font-medium text-gray-900">{blog.views || 0}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          <p className="text-gray-900 font-medium">
+                            {blog.publishedAt ? new Date(blog.publishedAt).toLocaleDateString() : 'Not published'}
+                          </p>
+                          <p className="text-gray-500 text-xs">
+                            {blog.readTime} min read
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditBlog(blog)}
+                            className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+                            title="Edit Blog"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleBlogStatus(blog)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              blog.status === 'published'
+                                ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700'
+                                : 'bg-green-100 hover:bg-green-200 text-green-700'
+                            }`}
+                            title={blog.status === 'published' ? 'Unpublish' : 'Publish'}
+                          >
+                            {blog.status === 'published' ? <EyeOff className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBlog(blog)}
+                            className="p-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors"
+                            title="Delete Blog"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-20 text-center">
+                      <div className="inline-block p-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl">
+                        <FileText className="w-16 h-16 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-600 font-semibold text-lg">No blogs found</p>
+                        <p className="text-sm text-gray-500 mt-1">Create your first blog post to get started</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Notification Component
   const Notification = () => notification && (
     <div className={`fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg z-50 ${
       notification.type === 'success' ? 'bg-green-500' :
       notification.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
     } text-white`}>
+
       {notification.message}
     </div>
   );
+
+  // Show loading state while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Reviews Tab
+  const renderReviews = () => {
+    const filteredReviews = reviews.filter(review => {
+      const matchesSearch = searchTerm === '' || 
+        review.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        review.vendorId?.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        review.userId?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = reviewFilter === 'all' || review.status === reviewFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header with Stats */}
+        <div className="bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 rounded-2xl shadow-xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">⭐ Review Management</h2>
+              <p className="text-white text-opacity-90">Approve, reject, or delete customer reviews</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{reviewStats?.totalReviews || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Total</p>
+              </div>
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{reviewStats?.pendingReviews || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Pending</p>
+              </div>
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{reviewStats?.approvedReviews || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Approved</p>
+              </div>
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{reviewStats?.rejectedReviews || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Rejected</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions and Filters */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Filter className="w-5 h-5 text-yellow-600" />
+              <h3 className="font-semibold text-gray-900">Search & Filter</h3>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-4 mt-4">
+            <div className="flex-1 min-w-[250px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search reviews by comment, vendor, or user..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all"
+                />
+              </div>
+            </div>
+            <select
+              value={reviewFilter}
+              onChange={(e) => {
+                setReviewFilter(e.target.value);
+                loadReviews();
+              }}
+              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-500 font-medium bg-white"
+            >
+              <option value="all">🔄 All Reviews</option>
+              <option value="pending">⏳ Pending</option>
+              <option value="approved">✅ Approved</option>
+              <option value="rejected">❌ Rejected</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Reviews Table */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          {filteredReviews.length > 0 ? (
+            <div className="divide-y divide-gray-200">
+              {filteredReviews.map((review) => (
+                <div key={review._id} className="p-6 hover:bg-yellow-50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4 flex-1">
+                      {/* Vendor Info */}
+                      <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
+                        {review.vendorId?.businessName?.charAt(0).toUpperCase() || 'V'}
+                      </div>
+                      
+                      <div className="flex-1">
+                        {/* Vendor Name */}
+                        <h3 className="font-bold text-lg text-gray-900 mb-1">
+                          {review.vendorId?.businessName || 'Unknown Vendor'}
+                        </h3>
+                        
+                        {/* Rating */}
+                        <div className="flex items-center gap-1 mb-2">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-5 h-5 ${
+                                i < review.rating
+                                  ? 'text-yellow-500 fill-yellow-500'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                          <span className="ml-2 text-sm font-semibold text-gray-700">
+                            {review.rating} / 5
+                          </span>
+                        </div>
+                        
+                        {/* Review Comment */}
+                        <p className="text-gray-700 mb-3 leading-relaxed">
+                          "{review.comment}"
+                        </p>
+                        
+                        {/* Reviewer Info */}
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span className="flex items-center gap-1">
+                            <Users className="w-4 h-4" />
+                            {review.userId?.name || 'Anonymous'}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {new Date(review.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Status and Actions */}
+                    <div className="flex flex-col items-end gap-3">
+                      {/* Status Badge */}
+                      <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                        review.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        review.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {review.status === 'pending' ? '⏳ Pending' :
+                         review.status === 'approved' ? '✅ Approved' :
+                         '❌ Rejected'}
+                      </span>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2">
+                        {review.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleApproveReview(review._id)}
+                              className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                              title="Approve Review"
+                            >
+                              <CheckCircle className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setConfirmDialog({
+                                  isOpen: true,
+                                  title: 'Reject Review',
+                                  message: 'Please provide a reason for rejecting this review:',
+                                  type: 'warning',
+                                  requireInput: true,
+                                  inputPlaceholder: 'Rejection reason...',
+                                  onConfirm: async (reason) => {
+                                    await handleRejectReview(review._id, reason || 'Does not meet community guidelines');
+                                  }
+                                });
+                              }}
+                              className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                              title="Reject Review"
+                            >
+                              <XCircle className="w-5 h-5" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => handleDeleteReview(review._id)}
+                          className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                          title="Delete Review"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20">
+              <Star className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Reviews Found</h3>
+              <p className="text-gray-600">
+                {reviewFilter !== 'all' 
+                  ? `No ${reviewFilter} reviews found. Try changing the filter.`
+                  : 'No reviews have been submitted yet.'}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMedia = () => {
+    const filteredMedia = media.filter(item => {
+      const matchesSearch = searchTerm === '' || 
+        item.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.vendorId?.businessName?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = mediaFilter === 'all' || item.approvalStatus === mediaFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header with Stats */}
+        <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 rounded-2xl shadow-xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">📸 Media Management</h2>
+              <p className="text-white text-opacity-90">Approve, reject, or delete vendor media</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{mediaStats?.totalMedia || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Total</p>
+              </div>
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{mediaStats?.pendingMedia || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Pending</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-4">
+          <select
+            value={mediaFilter}
+            onChange={(e) => setMediaFilter(e.target.value)}
+            className="px-4 py-2 border rounded-lg"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Search media..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 px-4 py-2 border rounded-lg"
+          />
+        </div>
+
+        {/* Media Grid */}
+        {filteredMedia.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg">
+            <p className="text-gray-500">No media found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredMedia.map((item) => (
+              <div key={item._id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <img src={item.url} alt={item.caption} className="w-full h-48 object-cover" />
+                <div className="p-4">
+                  <p className="font-semibold">{item.vendorId?.businessName}</p>
+                  <p className="text-sm text-gray-600">{item.caption}</p>
+                  <div className="mt-2">
+                    <span className={`inline-block px-2 py-1 rounded text-xs ${
+                      item.approvalStatus === 'approved' ? 'bg-green-100 text-green-800' :
+                      item.approvalStatus === 'rejected' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {item.approvalStatus}
+                    </span>
+                  </div>
+                  {item.approvalStatus === 'pending' && (
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => handleApproveMedia(item._id)}
+                        className="flex-1 px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleRejectMedia(item._id, 'Content policy violation')}
+                        className="flex-1 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => handleDeleteMedia(item._id)}
+                    className="w-full mt-2 px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderVendorBlogs = () => {
+    const filteredBlogs = vendorBlogs.filter(blog => {
+      const matchesSearch = searchTerm === '' || 
+        blog.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        blog.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        blog.vendorId?.businessName?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = vendorBlogFilter === 'all' || blog.approvalStatus === vendorBlogFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header with Stats */}
+        <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-2xl shadow-xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">📝 Vendor Blog Management</h2>
+              <p className="text-white text-opacity-90">Approve, reject, or delete vendor blogs</p>
+            </div>
+            <div className="flex gap-4">
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{vendorBlogStats?.totalBlogs || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Total</p>
+              </div>
+              <div className="bg-white bg-opacity-20 px-6 py-3 rounded-xl text-center">
+                <p className="text-3xl font-bold">{vendorBlogStats?.pendingBlogs || 0}</p>
+                <p className="text-sm text-white text-opacity-90">Pending</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-4">
+          <select
+            value={vendorBlogFilter}
+            onChange={(e) => setVendorBlogFilter(e.target.value)}
+            className="px-4 py-2 border rounded-lg"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Search blogs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 px-4 py-2 border rounded-lg"
+          />
+        </div>
+
+        {/* Blogs List */}
+        {filteredBlogs.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg">
+            <p className="text-gray-500">No blogs found</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredBlogs.map((blog) => (
+              <div key={blog._id} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold">{blog.title}</h3>
+                    <p className="text-sm text-gray-600 mt-1">{blog.vendorId?.businessName}</p>
+                    <p className="text-gray-700 mt-2 line-clamp-2">{blog.excerpt || blog.content?.substring(0, 150) + '...'}</p>
+                    <div className="flex gap-2 mt-3">
+                      <span className={`inline-block px-2 py-1 rounded text-xs ${
+                        blog.approvalStatus === 'approved' ? 'bg-green-100 text-green-800' :
+                        blog.approvalStatus === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {blog.approvalStatus}
+                      </span>
+                      <span className="inline-block px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
+                        {blog.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 ml-4">
+                    {blog.approvalStatus === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleApproveVendorBlog(blog._id)}
+                          className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectVendorBlog(blog._id, 'Content policy violation')}
+                          className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDeleteVendorBlog(blog._id)}
+                      className="px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1277,7 +2432,11 @@ const AdminPanel = () => {
               { id: 'overview', label: 'Dashboard', icon: BarChart3 },
               { id: 'inquiries', label: 'All Inquiries', icon: Mail },
               { id: 'vendors', label: 'Vendors', icon: Building2 },
-              { id: 'users', label: 'Users', icon: Users }
+              { id: 'users', label: 'Users', icon: Users },
+              { id: 'blogs', label: 'Blogs', icon: FileText },
+              { id: 'reviews', label: 'Reviews', icon: Star },
+              { id: 'media', label: 'Media', icon: Image },
+              { id: 'vendor-blogs', label: 'Vendor Blogs', icon: FileText }
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -1315,6 +2474,10 @@ const AdminPanel = () => {
             {activeTab === 'inquiries' && renderInquiries()}
             {activeTab === 'vendors' && renderVendors()}
             {activeTab === 'users' && renderUsers()}
+            {activeTab === 'blogs' && renderBlogs()}
+            {activeTab === 'reviews' && renderReviews()}
+            {activeTab === 'media' && renderMedia()}
+            {activeTab === 'vendor-blogs' && renderVendorBlogs()}
           </>
         )}
       </div>
@@ -1393,6 +2556,313 @@ const AdminPanel = () => {
         inputType={confirmDialog.inputType}
         selectOptions={confirmDialog.selectOptions}
       />
+
+      {/* Blog Modal */}
+      {showBlogModal && (
+        <BlogModal 
+          blog={editingBlog}
+          onSave={handleSaveBlog}
+          onClose={() => {
+            setShowBlogModal(false);
+            setEditingBlog(null);
+          }}
+          uploadingImage={uploadingImage}
+          onImageUpload={handleImageUpload}
+        />
+      )}
+    </div>
+  );
+};
+
+// Blog Modal Component
+const BlogModal = ({ blog, onSave, onClose, uploadingImage, onImageUpload }) => {
+  const [formData, setFormData] = useState({
+    title: blog?.title || '',
+    slug: blog?.slug || '',
+    excerpt: blog?.excerpt || '',
+    content: blog?.content || '',
+    featuredImage: typeof blog?.featuredImage === 'string' ? blog?.featuredImage : blog?.featuredImage?.url || '',
+    category: blog?.category || 'Event Planning',
+    tags: blog?.tags?.join(', ') || '',
+    status: blog?.status || 'draft'
+  });
+  const [manualSlug, setManualSlug] = useState(!!blog?.slug);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const newData = { ...prev, [name]: value };
+      // Auto-generate slug from title if not manually set
+      if (name === 'title' && !manualSlug) {
+        newData.slug = value
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+      }
+      return newData;
+    });
+  };
+
+  const handleSlugChange = (e) => {
+    setManualSlug(true);
+    setFormData(prev => ({ ...prev, slug: e.target.value }));
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const imageData = await onImageUpload(file);
+        // imageData is {url, publicId} from uploadBlogImage
+        setFormData(prev => ({ ...prev, featuredImage: imageData }));
+      } catch (error) {
+        console.error('Image upload failed:', error);
+      }
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Prepare blog data with proper structure
+    const blogData = {
+      title: formData.title,
+      slug: formData.slug,
+      excerpt: formData.excerpt,
+      content: formData.content,
+      // Handle featuredImage - can be string URL or {url, publicId} object
+      featuredImage: typeof formData.featuredImage === 'object' && formData.featuredImage?.url
+        ? formData.featuredImage
+        : { url: formData.featuredImage, publicId: '' },
+      category: formData.category,
+      tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+      status: formData.status
+    };
+    
+    console.log('📤 Submitting blog data:', blogData);
+    onSave(blogData);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="absolute inset-0 bg-black opacity-50" onClick={onClose}></div>
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-modalSlideIn">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {blog ? '✏️ Edit Blog' : '➕ Create New Blog'}
+          </h2>
+          <button 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Title & Category Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                placeholder="Enter an engaging blog title..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Category <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              >
+                <option value="Event Planning">Event Planning</option>
+                <option value="Wedding Ideas">Wedding Ideas</option>
+                <option value="Corporate Events">Corporate Events</option>
+                <option value="Party Tips">Party Tips</option>
+                <option value="Vendor Guides">Vendor Guides</option>
+                <option value="Industry News">Industry News</option>
+              </select>
+            </div>
+          </div>
+
+          {/* URL Slug - Auto-generated */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              URL Slug <span className="text-xs text-gray-500 font-normal">(auto-generated, editable)</span>
+            </label>
+            <input
+              type="text"
+              name="slug"
+              value={formData.slug}
+              onChange={handleSlugChange}
+              required
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              placeholder="url-friendly-slug"
+            />
+            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+              <span>🔗</span> URL: <span className="font-mono text-indigo-600">/blogs/{formData.slug || 'your-slug'}</span>
+            </p>
+          </div>
+
+          {/* Excerpt */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Excerpt <span className="text-red-500">*</span>
+              <span className="text-xs text-gray-500 font-normal ml-2">(Brief summary - max 300 chars)</span>
+            </label>
+            <textarea
+              name="excerpt"
+              value={formData.excerpt}
+              onChange={handleChange}
+              required
+              rows={3}
+              maxLength={300}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none"
+              placeholder="Write a compelling short description that will appear in blog cards..."
+            />
+            <p className="text-xs text-gray-400 mt-1 text-right">{formData.excerpt.length}/300</p>
+          </div>
+
+          {/* Content */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Content <span className="text-red-500">*</span>
+              <span className="text-xs text-gray-500 font-normal ml-2">(Full blog post content)</span>
+            </label>
+            <textarea
+              name="content"
+              value={formData.content}
+              onChange={handleChange}
+              required
+              rows={12}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-y"
+              placeholder="Write your full blog content here...\n\nTips:\n• Use clear paragraphs\n• Add headings for sections\n• Keep it engaging and informative\n• Include relevant examples"
+            />
+          </div>
+
+          {/* Featured Image */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Featured Image <span className="text-red-500">*</span>
+            </label>
+            <div className="space-y-3">
+              {/* Upload Button - Primary Option */}
+              <label className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold cursor-pointer transition-all shadow-md hover:shadow-lg">
+                <Upload className="w-5 h-5" />
+                {uploadingImage ? 'Uploading Image...' : 'Upload Featured Image'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                  disabled={uploadingImage}
+                />
+              </label>
+              
+              {/* OR Divider */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 border-t border-gray-300"></div>
+                <span className="text-sm text-gray-500 font-medium">OR</span>
+                <div className="flex-1 border-t border-gray-300"></div>
+              </div>
+              
+              {/* URL Input - Secondary Option */}
+              <input
+                type="url"
+                name="featuredImage"
+                value={typeof formData.featuredImage === 'object' ? formData.featuredImage?.url || '' : formData.featuredImage}
+                onChange={(e) => setFormData(prev => ({ ...prev, featuredImage: e.target.value }))}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                placeholder="Or paste image URL here..."
+              />
+              
+              {/* Image Preview */}
+              {(typeof formData.featuredImage === 'string' ? formData.featuredImage : formData.featuredImage?.url) && (
+                <div className="relative rounded-xl overflow-hidden border-2 border-indigo-200">
+                  <img 
+                    src={typeof formData.featuredImage === 'string' ? formData.featuredImage : formData.featuredImage?.url} 
+                    alt="Featured preview" 
+                    className="w-full h-64 object-cover"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/800x400?text=Image+Not+Found';
+                    }}
+                  />
+                  <div className="absolute top-2 right-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, featuredImage: '' }))}
+                      className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-all shadow-lg"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tags & Status Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Tags <span className="text-xs text-gray-500 font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                name="tags"
+                value={formData.tags}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                placeholder="wedding, party, planning (comma-separated)"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              >
+                <option value="draft">📝 Draft</option>
+                <option value="published">✅ Published</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-4 justify-end pt-4 border-t-2 border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl font-bold transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl"
+            >
+              {blog ? 'Update Blog' : 'Create Blog'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

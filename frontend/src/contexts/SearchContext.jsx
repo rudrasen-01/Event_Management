@@ -69,6 +69,27 @@ export const SearchProvider = ({ children }) => {
     };
     setFilters(resetFilters);
   };
+
+  // Reset all search state (for navigation guard)
+  const resetSearchState = () => {
+    setSearchQuery('');
+    setSelectedCity('');
+    setSelectedArea('');
+    setLocation('');
+    setDetailedLocation({
+      city: '',
+      area: '',
+      street: '',
+      latitude: null,
+      longitude: null,
+      fullAddress: ''
+    });
+    clearAllFilters();
+    setSortBy('relevance');
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setLocationStatus('');
+  };
   
   // Update location
   const updateLocation = (city, area) => {
@@ -151,6 +172,7 @@ export const SearchProvider = ({ children }) => {
     updateFilter,
     updateFilters,
     clearAllFilters,
+    resetSearchState,
     updateLocation,
     updateDetailedLocation,
     syncWithURL
